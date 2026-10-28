@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const auctionSchema = new mongoose.Schema(
   {
+    // Existing fields ...
+
     title: {
       type: String,
       required: [true, 'Title is required'],
@@ -49,8 +51,17 @@ const auctionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'active', 'ended', 'cancelled'],
+      enum: ['draft', 'active', 'ended', 'cancelled', 'unsold', 'sold'],
       default: 'active',
+    },
+    sellerDecision: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    decisionTimestamp: {
+      type: Date,
+      default: null,
     },
     startTime: {
       type: Date,
