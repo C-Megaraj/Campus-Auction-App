@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { addCustomAuction, CATEGORIES, CONDITIONS } from '../utils/mockAuctions'
+import { useAuth } from '../context/AuthContext'
+import { createListing } from '../services/api'
+import { CATEGORIES, CONDITIONS } from '../utils/mockAuctions'
 import './CreateAuction.css'
 
 const PRESET_ICONS = ['💻', '📚', '🚲', '🎧', '🖥️', '🧊', '🪑', '👕', '💡', '📱', '🎒', '⌚', '📦', '🛹']
@@ -15,6 +17,7 @@ const PRESET_COLORS = [
 
 export default function CreateAuction() {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   // Form State
   const [title, setTitle] = useState('')
@@ -24,6 +27,7 @@ export default function CreateAuction() {
   const [description, setDescription] = useState('')
   const [startingBid, setStartingBid] = useState('')
   const [minIncrement, setMinIncrement] = useState('2')
+  const [imageUrl, setImageUrl] = useState('')
   const [closingDateTime, setClosingDateTime] = useState(() => {
     // Default to 48 hours from now
     const d = new Date(Date.now() + 48 * 3600 * 1000)
@@ -32,7 +36,6 @@ export default function CreateAuction() {
   })
   const [selectedIcon, setSelectedIcon] = useState('💻')
   const [selectedColor, setSelectedColor] = useState('#8b5cf6')
-  const [sellerName, setSellerName] = useState('Student Seller (You)')
   const [campusLocation, setCampusLocation] = useState('Student Union / Campus Quad')
 
   // Validation errors
@@ -50,21 +53,14 @@ export default function CreateAuction() {
     }
   }
 
-  // Calculate minutes until end time
-  const getMinutesUntilEnd = () => {
-    if (!closingDateTime) return 60
-    const diffMs = new Date(closingDateTime).getTime() - Date.now()
-    return Math.max(1, Math.round(diffMs / 60000))
-  }
-
   // Validate form
   const validateForm = () => {
     const errs = {}
 
     if (!title.trim()) {
       errs.title = 'Item title is required.'
-    } else if (title.trim().length < 5) {
-      errs.title = 'Title must be at least 5 characters.'
+    } else if (title.trim().length < 3) {
+      errs.title = 'Title must be at least 3 characters.'
     }
 
     if (!category) {
@@ -77,8 +73,8 @@ export default function CreateAuction() {
 
     if (!description.trim()) {
       errs.description = 'Item description is required.'
-    } else if (description.trim().length < 15) {
-      errs.description = 'Description should be at least 15 characters to inform student bidders.'
+    } else if (description.trim().length < 10) {
+      errs.description = 'Description should be at least 10 characters to inform student bidders.'
     }
 
     const priceNum = Number(startingBid)
@@ -88,15 +84,23 @@ export default function CreateAuction() {
 
     const incNum = Number(minIncrement)
     if (!minIncrement || isNaN(incNum) || incNum < 1) {
-      errs.minIncrement = 'Minimum increment must be at least $1.'
+      errs.minIncrement = 'Minimum increment must be at least $1.00.'
     }
 
     if (!closingDateTime) {
       errs.closingDateTime = 'Please select a closing date and time.'
     } else {
       const selectedTime = new Date(closingDateTime).getTime()
-      if (selectedTime <= Date.now() + 10 * 60 * 1000) {
-        errs.closingDateTime = 'Closing time must be at least 10 minutes in the future.'
+      if (selectedTime <= Date.now() + 2 * 60 * 1000) {
+        errs.closingDateTime = 'Closing time must be at least 2 minutes in the future.'
+      }
+    }
+
+    if (imageUrl.trim()) {
+      try {
+        new URL(imageUrl.trim())
+      } catch {
+        errs.imageUrl = 'Please enter a valid URL (starting with http:// or https://).'
       }
     }
 
@@ -104,60 +108,54 @@ export default function CreateAuction() {
     return Object.keys(errs).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (!validateForm()) return
 
     setIsSubmitting(true)
+    setErrors({})
+    setSuccessMessage(null)
 
-    const categoryObj = CATEGORIES.find((c) => c.id === category) || { label: 'Other Items' }
-    const initialMinutes = getMinutesUntilEnd()
+    try {
+      const payload = {
+        title: title.trim(),
+        category,
+        condition,
+        description: descriptionNotesCombined(),
+        starting_price: Number(startingBid),
+        minimum_bid_increment: Number(minIncrement),
+        closing_at: new Date(closingDateTime).toISOString(),
+        image_url: imageUrl.trim() || undefined,
+      }
 
-    const newAuctionPayload = {
-      title: title.trim(),
-      category,
-      categoryName: categoryObj.label,
-      condition,
-      conditionDescription: conditionNotes.trim() || `Item in ${condition} condition as inspected by seller.`,
-      description: description.trim(),
-      startingBid: Number(startingBid),
-      currentBid: Number(startingBid),
-      minIncrement: Number(minIncrement),
-      initialMinutesLeft: initialMinutes,
-      seller: {
-        name: sellerName.trim() || 'Student Seller',
-        major: 'Verified Student',
-        gradYear: "'25",
-        rating: '5.0',
-        reviewsCount: 1,
-        verified: true,
-        pickupSpot: campusLocation.trim() || 'Campus Public Area',
-      },
-      campusLocation: campusLocation.trim() || 'Campus Center',
-      icon: selectedIcon,
-      accentColor: selectedColor,
-      photos: [
-        {
-          id: 'p1',
-          label: 'Primary Item View',
-          icon: selectedIcon,
-          bg: `linear-gradient(135deg, ${selectedColor} 0%, #1e1b4b 100%)`,
-        },
-      ],
-    }
+      const res = await createListing(payload)
 
-    const created = addCustomAuction(newAuctionPayload)
-
-    if (created) {
-      setSuccessMessage('Listing created successfully! Redirecting to your auction...')
-      setTimeout(() => {
-        navigate(`/auctions/${created.id}`)
-      }, 1200)
-    } else {
+      if (res && res.success && res.listing) {
+        setSuccessMessage('Auction listing created successfully! Redirecting to your auction...')
+        setTimeout(() => {
+          navigate(`/auctions/${res.listing.id}`)
+        }, 800)
+      } else {
+        setErrors({ form: res?.message || 'Failed to publish listing.' })
+        setIsSubmitting(false)
+      }
+    } catch (err) {
+      console.error('Error creating listing:', err)
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to connect to the auction server. Please verify backend and MySQL are running.'
+      setErrors({ form: errorMsg })
       setIsSubmitting(false)
-      setErrors({ form: 'Failed to save listing to local storage. Please try again.' })
     }
+  }
+
+  const descriptionNotesCombined = () => {
+    if (conditionNotes.trim()) {
+      return `${description.trim()}\n\n[Condition Notes: ${conditionNotes.trim()}]`
+    }
+    return description.trim()
   }
 
   // Filter out 'all' category for the dropdown
@@ -186,17 +184,6 @@ export default function CreateAuction() {
         <p className="create-page-subtitle">
           Turn unused college gear, textbooks, or electronics into cash with peer student bidding
         </p>
-      </div>
-
-      {/* DEMO NOTICE BANNER */}
-      <div className="create-demo-banner">
-        <span className="banner-icon">💡</span>
-        <div className="banner-text">
-          <strong>Local Demo Mode</strong>
-          <p>
-            Your listing will be saved in your browser's local storage and will immediately appear in live auctions, search results, and categories across the app. Remote database synchronization is coming in a future backend milestone.
-          </p>
-        </div>
       </div>
 
       {/* SUCCESS MESSAGE BANNER */}
@@ -237,7 +224,7 @@ export default function CreateAuction() {
                   setTitle(e.target.value)
                   if (errors.title) setErrors((prev) => ({ ...prev, title: null }))
                 }}
-                maxLength={90}
+                maxLength={150}
               />
               <div className="field-hint-row">
                 {errors.title ? (
@@ -245,7 +232,7 @@ export default function CreateAuction() {
                 ) : (
                   <span className="form-hint">Be specific with brand, model, or course requirement</span>
                 )}
-                <span className="char-count">{title.length}/90</span>
+                <span className="char-count">{title.length}/150</span>
               </div>
             </div>
 
@@ -333,7 +320,7 @@ export default function CreateAuction() {
               {errors.description ? (
                 <span className="error-hint">{errors.description}</span>
               ) : (
-                <span className="form-hint">At least 15 characters describing what's included and campus pickup details</span>
+                <span className="form-hint">At least 10 characters describing the item and campus meetup details</span>
               )}
             </div>
           </div>
@@ -354,7 +341,7 @@ export default function CreateAuction() {
                     id="starting-bid-input"
                     type="number"
                     min="1"
-                    step="1"
+                    step="0.50"
                     placeholder="25"
                     className={`form-text-input with-prefix ${errors.startingBid ? 'input-error' : ''}`}
                     value={startingBid}
@@ -378,7 +365,7 @@ export default function CreateAuction() {
                     id="min-inc-input"
                     type="number"
                     min="1"
-                    step="1"
+                    step="0.50"
                     placeholder="2"
                     className={`form-text-input with-prefix ${errors.minIncrement ? 'input-error' : ''}`}
                     value={minIncrement}
@@ -425,11 +412,33 @@ export default function CreateAuction() {
 
           {/* SECTION 3: VISUALS & SELLER INFO */}
           <div className="form-section-block">
-            <h2 className="form-section-title">3. Item Visual & Seller Pickup</h2>
+            <h2 className="form-section-title">3. Item Photos & Visual Preview</h2>
+
+            {/* Item Image URL */}
+            <div className="form-field-group">
+              <label htmlFor="image-url-input" className="form-label">
+                Public Image URL (Optional)
+              </label>
+              <input
+                id="image-url-input"
+                type="url"
+                className={`form-text-input ${errors.imageUrl ? 'input-error' : ''}`}
+                placeholder="https://images.unsplash.com/... or hosted student photo"
+                value={imageUrl}
+                onChange={(e) => {
+                  setImageUrl(e.target.value)
+                  if (errors.imageUrl) setErrors((prev) => ({ ...prev, imageUrl: null }))
+                }}
+              />
+              <span className="form-hint">
+                Provide an image URL to show the actual item photo, or select an emoji thumbnail below. (Remote image URLs are stored permanently in MySQL).
+              </span>
+              {errors.imageUrl && <span className="error-hint">{errors.imageUrl}</span>}
+            </div>
 
             {/* Preset Icon Choice */}
             <div className="form-field-group">
-              <span className="form-label">Item Thumbnail Icon:</span>
+              <span className="form-label">Fallback Thumbnail Icon:</span>
               <div className="icon-selector-grid">
                 {PRESET_ICONS.map((icon) => (
                   <button
@@ -461,34 +470,20 @@ export default function CreateAuction() {
               </div>
             </div>
 
-            {/* Seller & Meetup */}
-            <div className="form-row-two-col">
-              <div className="form-field-group">
-                <label htmlFor="seller-name-input" className="form-label">
-                  Seller Display Name
-                </label>
-                <input
-                  id="seller-name-input"
-                  type="text"
-                  className="form-text-input"
-                  value={sellerName}
-                  onChange={(e) => setSellerName(e.target.value)}
-                />
-              </div>
-
-              <div className="form-field-group">
-                <label htmlFor="location-input" className="form-label">
-                  Campus Pickup Spot
-                </label>
-                <input
-                  id="location-input"
-                  type="text"
-                  className="form-text-input"
-                  value={campusLocation}
-                  onChange={(e) => setCampusLocation(e.target.value)}
-                  placeholder="e.g. Main Library, Science Quad"
-                />
-              </div>
+            {/* Pickup Spot */}
+            <div className="form-field-group">
+              <label htmlFor="location-input" className="form-label">
+                Campus Meetup & Handoff Location
+              </label>
+              <input
+                id="location-input"
+                type="text"
+                className="form-text-input"
+                value={campusLocation}
+                onChange={(e) => setCampusLocation(e.target.value)}
+                placeholder="e.g. Science Library, Student Center Lobby"
+              />
+              <span className="form-hint">Where you plan to exchange the item with the winning student bidder</span>
             </div>
           </div>
 
@@ -499,13 +494,14 @@ export default function CreateAuction() {
               disabled={isSubmitting}
               className="btn-create-submit"
             >
-              {isSubmitting ? 'Publishing Listing...' : 'Publish Campus Listing'}
+              {isSubmitting ? 'Publishing Listing to MySQL...' : 'Publish Campus Listing'}
               <span className="arrow-icon">→</span>
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
               className="btn-create-cancel"
+              disabled={isSubmitting}
             >
               Cancel
             </button>
@@ -527,7 +523,23 @@ export default function CreateAuction() {
                 style={{ borderTop: `4px solid ${selectedColor}` }}
               >
                 <div className="preview-visual-box">
-                  <span className="preview-item-emoji">{selectedIcon}</span>
+                  {imageUrl.trim() ? (
+                    <img
+                      src={imageUrl.trim()}
+                      alt="Preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '18px' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                        if (e.currentTarget.nextSibling) e.currentTarget.nextSibling.style.display = 'inline'
+                      }}
+                    />
+                  ) : null}
+                  <span
+                    className="preview-item-emoji"
+                    style={imageUrl.trim() ? { display: 'none' } : {}}
+                  >
+                    {selectedIcon}
+                  </span>
                 </div>
                 <div className="preview-top-badges">
                   <span className="badge-tag">
@@ -544,7 +556,7 @@ export default function CreateAuction() {
                 </h3>
 
                 <div className="preview-seller-row">
-                  <span>👤 {sellerName.trim() || 'You (Verified)'}</span>
+                  <span>👤 {user?.full_name || user?.name || 'You (Verified Student)'}</span>
                   <span>📍 {campusLocation.trim() || 'Campus Center'}</span>
                 </div>
 
@@ -557,12 +569,12 @@ export default function CreateAuction() {
                     <span className="preview-price-label">Starting Price</span>
                     <div className="preview-price-row">
                       <span className="curr">$</span>
-                      <span className="amt">{startingBid || '0'}</span>
+                      <span className="amt">{startingBid || '0.00'}</span>
                     </div>
                   </div>
                   <div className="preview-bids-col">
                     <span className="bids-tag">0 bids</span>
-                    <span className="inc-tag">+${minIncrement || '1'} min</span>
+                    <span className="inc-tag">+${minIncrement || '1.00'} min</span>
                   </div>
                 </div>
 

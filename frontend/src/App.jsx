@@ -10,6 +10,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import AuctionDetail from './pages/AuctionDetail'
 import CreateAuction from './pages/CreateAuction'
+import EditAuction from './pages/EditAuction'
+import MyListings from './pages/MyListings'
 import Watchlist from './pages/Watchlist'
 import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
@@ -25,10 +27,26 @@ export default function App() {
             <Route path="/auctions" element={<Home />} />
             <Route path="/auctions/:id" element={<AuctionDetail />} />
             <Route
+              path="/auctions/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <EditAuction />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/auctions/create"
               element={
                 <ProtectedRoute>
                   <CreateAuction />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-listings"
+              element={
+                <ProtectedRoute>
+                  <MyListings />
                 </ProtectedRoute>
               }
             />

@@ -34,6 +34,11 @@ export default function Navbar() {
 
         <div className="navbar-links">
           <Link to="/" className={`nav-link ${isHome ? 'active' : ''}`}>Explore</Link>
+          {user && (
+            <Link to="/my-listings" className={`nav-link ${location.pathname === '/my-listings' ? 'active' : ''}`}>
+              My Listings
+            </Link>
+          )}
           <Link to="/watchlist" className={`nav-link nav-watchlist-link ${location.pathname === '/watchlist' ? 'active' : ''}`}>
             <span>❤️ Watchlist</span>
             {watchlistCount > 0 && (

@@ -147,6 +147,13 @@ export default function Profile() {
           ➕ List an Item for Auction
         </Link>
         <Link
+          to="/my-listings"
+          className="btn-hero-secondary"
+          style={{ textDecoration: 'none', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-h)' }}
+        >
+          📋 Manage My Listings
+        </Link>
+        <Link
           to="/watchlist"
           className="btn-hero-secondary"
           style={{ textDecoration: 'none', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-h)' }}

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getAuctionById } from '../utils/mockAuctions'
-import { fetchListingById } from '../services/api'
+import { fetchListingById, cancelListing } from '../services/api'
 import { useWatchlist } from '../context/WatchlistContext'
+import { useAuth } from '../context/AuthContext'
 import './AuctionDetail.css'
 
 function formatTimeAgo(dateString) {
@@ -19,6 +20,7 @@ function formatTimeAgo(dateString) {
 export default function AuctionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { isWatched, toggleWatchlist } = useWatchlist()
 
   // Data fetching states
@@ -294,6 +296,25 @@ export default function AuctionDetail() {
           <span>{watched ? '❤️ Saved to Watchlist' : '🤍 Save to Watchlist'}</span>
         </button>
       </nav>
+
+      {/* SELLER OWNER CONTROLS BANNER */}
+      {user && (user.id === (auction.seller?.id || auction.seller_id)) && (
+        <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <strong style={{ color: 'var(--text-h)' }}>👑 You are the seller of this auction</strong>
+            <p style={{ margin: '0.2rem 0 0', color: 'var(--text)', fontSize: '0.88rem' }}>
+              Status: <strong>{auction.status}</strong> • You can modify listing details or cancel the auction if eligible.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {(auction.status === 'active' || auction.status === 'closing_soon') && (
+              <Link to={`/auctions/${auction.id}/edit`} className="btn-hero-primary" style={{ textDecoration: 'none', padding: '0.5rem 1rem', fontSize: '0.88rem' }}>
+                ✏️ Edit Listing
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* FUTURE BIDDING NOTIFICATION BANNER */}
       {biddingNotice && (

@@ -7,7 +7,7 @@ const api = axios.create({
   timeout: 10000,
 })
 
-// Request interceptor to attach JWT token if present in localStorage as well
+// Request interceptor to attach JWT token if present in localStorage
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
@@ -26,7 +26,7 @@ api.interceptors.response.use(
     // Only redirect to login if 401 occurs on protected mutations, not on public browsing or initial auth check
     const url = error.config?.url || ''
     const isPublicAuthOrBrowse =
-      url.includes('/listings') ||
+      url.includes('/listings') && error.config.method === 'get' ||
       url.includes('/auth/me') ||
       url.includes('/auth/login') ||
       url.includes('/auth/register')
@@ -54,6 +54,38 @@ export const fetchListings = async (params = {}) => {
  */
 export const fetchListingById = async (id) => {
   const { data } = await api.get(`/listings/${id}`)
+  return data
+}
+
+/**
+ * Fetch listings created by the authenticated student
+ */
+export const fetchMyListings = async () => {
+  const { data } = await api.get('/listings/my-listings')
+  return data
+}
+
+/**
+ * Create a new auction listing (Authenticated)
+ */
+export const createListing = async (listingData) => {
+  const { data } = await api.post('/listings', listingData)
+  return data
+}
+
+/**
+ * Update an existing auction listing (Owner only)
+ */
+export const updateListing = async (id, listingData) => {
+  const { data } = await api.put(`/listings/${id}`, listingData)
+  return data
+}
+
+/**
+ * Cancel an auction listing (Owner only)
+ */
+export const cancelListing = async (id) => {
+  const { data } = await api.delete(`/listings/${id}`)
   return data
 }
 
