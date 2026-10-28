@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useWatchlist } from '../context/WatchlistContext'
+import { formatImageUrl } from '../utils/imageUrl'
 import './AuctionCard.css'
 
 export default function AuctionCard({ auction, secondsElapsed = 0 }) {
@@ -67,7 +68,8 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
     ? '🚲'
     : '📦'
   const itemIcon = auction.icon || fallbackIcon
-  const primaryImageUrl = auction.primary_image_url || (auction.images && auction.images[0]?.image_url) || null
+  const rawImageUrl = auction.primary_image_url || (auction.images && auction.images[0]?.image_url) || null
+  const primaryImageUrl = formatImageUrl(rawImageUrl)
 
   const handleWatchlistClick = (e) => {
     e.preventDefault()

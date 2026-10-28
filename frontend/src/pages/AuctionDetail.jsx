@@ -13,6 +13,7 @@ import {
 } from '../services/api'
 import { useWatchlist } from '../context/WatchlistContext'
 import { useAuth } from '../context/AuthContext'
+import { formatImageUrl } from '../utils/imageUrl'
 import './AuctionDetail.css'
 
 function formatTimeAgo(dateString) {
@@ -278,18 +279,21 @@ export default function AuctionDetail() {
   if (Array.isArray(auction.images) && auction.images.length > 0) {
     photos = auction.images.map((img, idx) => ({
       id: img.id || `img-${idx}`,
-      url: img.image_url,
+      url: formatImageUrl(img.image_url),
       label: img.is_primary ? 'Primary View' : `Photo #${idx + 1}`,
       icon: defaultIcon,
       bg: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
     }))
   } else if (Array.isArray(auction.photos) && auction.photos.length > 0) {
-    photos = auction.photos
+    photos = auction.photos.map((p, idx) => ({
+      ...p,
+      url: formatImageUrl(p.url),
+    }))
   } else {
     photos = [
       {
         id: 'p1',
-        url: auction.primary_image_url || null,
+        url: formatImageUrl(auction.primary_image_url),
         label: 'Primary Item View',
         icon: auction.icon || defaultIcon,
         bg: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
