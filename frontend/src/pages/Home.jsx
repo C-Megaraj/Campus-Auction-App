@@ -1,252 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  SAMPLE_AUCTIONS,
+  CATEGORIES,
+  CONDITIONS,
+  SORT_OPTIONS,
+} from '../utils/mockAuctions'
 import './Home.css'
-
-// Mock auction data representing campus items across the 4 required categories
-// and 4 required conditions (New, Like New, Good, Fair)
-const SAMPLE_AUCTIONS = [
-  {
-    id: 'auc-1',
-    title: 'TI-84 Plus CE Color Graphing Calculator (With Charger & Case)',
-    category: 'electronics',
-    categoryName: 'Electronics',
-    condition: 'Like New',
-    currentBid: 68,
-    startingBid: 30,
-    minIncrement: 2,
-    bidsCount: 14,
-    initialMinutesLeft: 42,
-    seller: 'Alex M.',
-    campusLocation: 'Engineering Quad • Hall A',
-    icon: '📟',
-    accentColor: '#8b5cf6',
-    verifiedStudent: true,
-    tag: 'Ending Soon',
-  },
-  {
-    id: 'auc-2',
-    title: 'Organic Chemistry (Vollhardt & Schore 8th Ed) + Full Study Guide',
-    category: 'books',
-    categoryName: 'Books',
-    condition: 'Good',
-    currentBid: 45,
-    startingBid: 20,
-    minIncrement: 2,
-    bidsCount: 9,
-    initialMinutesLeft: 135,
-    seller: 'Priya S.',
-    campusLocation: 'Biochem Lab • Science Hall',
-    icon: '📚',
-    accentColor: '#3b82f6',
-    verifiedStudent: true,
-    tag: 'Course Required',
-  },
-  {
-    id: 'auc-3',
-    title: 'Trek FX 2 Disc Hybrid Commuter Bike (Medium Frame, with U-Lock)',
-    category: 'cycles',
-    categoryName: 'Cycles',
-    condition: 'Like New',
-    currentBid: 195,
-    startingBid: 120,
-    minIncrement: 5,
-    bidsCount: 22,
-    initialMinutesLeft: 340,
-    seller: 'Marcus K.',
-    campusLocation: 'West Dormitory Bicycle Bay',
-    icon: '🚲',
-    accentColor: '#10b981',
-    verifiedStudent: true,
-    tag: 'Popular',
-  },
-  {
-    id: 'auc-4',
-    title: 'Dell UltraSharp 27" 4K USB-C Hub Monitor (Model U2720Q)',
-    category: 'electronics',
-    categoryName: 'Electronics',
-    condition: 'New',
-    currentBid: 230,
-    startingBid: 150,
-    minIncrement: 10,
-    bidsCount: 18,
-    initialMinutesLeft: 840,
-    seller: 'Chen W.',
-    campusLocation: 'Tech Village Tower 2',
-    icon: '🖥️',
-    accentColor: '#6366f1',
-    verifiedStudent: true,
-    tag: 'High Demand',
-  },
-  {
-    id: 'auc-5',
-    title: 'Compact Dorm Mini-Fridge with Top Freezer (3.2 cu. ft EnergyStar)',
-    category: 'other',
-    categoryName: 'Other Items',
-    condition: 'Good',
-    currentBid: 58,
-    startingBid: 25,
-    minIncrement: 3,
-    bidsCount: 11,
-    initialMinutesLeft: 75,
-    seller: 'Sarah T.',
-    campusLocation: 'East Quad Residence Hall',
-    icon: '🧊',
-    accentColor: '#f59e0b',
-    verifiedStudent: true,
-    tag: 'Must Go',
-  },
-  {
-    id: 'auc-6',
-    title: 'Sony WH-1000XM4 Noise Canceling Wireless Headphones (Silver)',
-    category: 'electronics',
-    categoryName: 'Electronics',
-    condition: 'Like New',
-    currentBid: 145,
-    startingBid: 85,
-    minIncrement: 5,
-    bidsCount: 16,
-    initialMinutesLeft: 52,
-    seller: 'Elena R.',
-    campusLocation: 'Law Library Study Lounge',
-    icon: '🎧',
-    accentColor: '#ec4899',
-    verifiedStudent: true,
-    tag: 'Ending Soon',
-  },
-  {
-    id: 'auc-7',
-    title: 'Official Campus Championship Vintage Navy Hoodie (Size Large)',
-    category: 'other',
-    categoryName: 'Other Items',
-    condition: 'Like New',
-    currentBid: 32,
-    startingBid: 15,
-    minIncrement: 1,
-    bidsCount: 7,
-    initialMinutesLeft: 1280,
-    seller: 'Jordan L.',
-    campusLocation: 'Student Athletic Center',
-    icon: '👕',
-    accentColor: '#0ea5e9',
-    verifiedStudent: true,
-    tag: 'Collector',
-  },
-  {
-    id: 'auc-8',
-    title: 'Ergonomic High-Back Mesh Desk Chair with 3D Armrests',
-    category: 'other',
-    categoryName: 'Other Items',
-    condition: 'Good',
-    currentBid: 82,
-    startingBid: 40,
-    minIncrement: 5,
-    bidsCount: 13,
-    initialMinutesLeft: 610,
-    seller: 'Kevin P.',
-    campusLocation: 'South Quad Apartments',
-    icon: '🪑',
-    accentColor: '#14b8a6',
-    verifiedStudent: true,
-    tag: 'Dorm Essential',
-  },
-  {
-    id: 'auc-9',
-    title: 'Calculus: Early Transcendentals (Stewart 9th Edition Hardcover)',
-    category: 'books',
-    categoryName: 'Books',
-    condition: 'New',
-    currentBid: 75,
-    startingBid: 45,
-    minIncrement: 5,
-    bidsCount: 8,
-    initialMinutesLeft: 210,
-    seller: 'Maya J.',
-    campusLocation: 'Math Dept • East Hall',
-    icon: '📖',
-    accentColor: '#0284c7',
-    verifiedStudent: true,
-    tag: 'Brand New',
-  },
-  {
-    id: 'auc-10',
-    title: 'Vintage Raleigh 10-Speed Road Bicycle (Rideable, Solid Steel Frame)',
-    category: 'cycles',
-    categoryName: 'Cycles',
-    condition: 'Fair',
-    currentBid: 40,
-    startingBid: 25,
-    minIncrement: 2,
-    bidsCount: 15,
-    initialMinutesLeft: 18,
-    seller: 'Liam D.',
-    campusLocation: 'North Campus Bike Rack',
-    icon: '🚲',
-    accentColor: '#e11d48',
-    verifiedStudent: true,
-    tag: 'Ending Soon',
-  },
-  {
-    id: 'auc-11',
-    title: 'Logitech MX Master 3S Wireless Performance Mouse (Graphite)',
-    category: 'electronics',
-    categoryName: 'Electronics',
-    condition: 'Like New',
-    currentBid: 52,
-    startingBid: 30,
-    minIncrement: 2,
-    bidsCount: 12,
-    initialMinutesLeft: 95,
-    seller: 'David K.',
-    campusLocation: 'CS Computer Lab B',
-    icon: '🖱️',
-    accentColor: '#6366f1',
-    verifiedStudent: true,
-    tag: 'High Demand',
-  },
-  {
-    id: 'auc-12',
-    title: 'Dorm Multi-Angle Floor Lamp with Warm Reading Light',
-    category: 'other',
-    categoryName: 'Other Items',
-    condition: 'Fair',
-    currentBid: 16,
-    startingBid: 10,
-    minIncrement: 1,
-    bidsCount: 5,
-    initialMinutesLeft: 110,
-    seller: 'Emily R.',
-    campusLocation: 'West Tower Common Room',
-    icon: '💡',
-    accentColor: '#ca8a04',
-    verifiedStudent: true,
-    tag: 'Budget Pick',
-  },
-]
-
-// 4 Required Categories + All
-const CATEGORIES = [
-  { id: 'all', label: 'All Items', icon: '✨' },
-  { id: 'books', label: 'Books', icon: '📚' },
-  { id: 'electronics', label: 'Electronics', icon: '💻' },
-  { id: 'cycles', label: 'Cycles', icon: '🚲' },
-  { id: 'other', label: 'Other Items', icon: '📦' },
-]
-
-// 4 Required Conditions + All
-const CONDITIONS = [
-  { id: 'all', label: 'All Conditions' },
-  { id: 'New', label: 'New' },
-  { id: 'Like New', label: 'Like New' },
-  { id: 'Good', label: 'Good' },
-  { id: 'Fair', label: 'Fair' },
-]
-
-// Required Sorting Options
-const SORT_OPTIONS = [
-  { id: 'closing-soon', label: 'Closing Soon' },
-  { id: 'price-low-high', label: 'Price: Low to High' },
-  { id: 'price-high-low', label: 'Price: High to Low' },
-]
 
 export default function Home() {
   // Filter & Search States
@@ -617,37 +377,42 @@ export default function Home() {
           <div className="auction-grid">
             {filteredAuctions.map((item) => {
               const time = formatTimeRemaining(item.initialMinutesLeft)
+              const sellerName = typeof item.seller === 'object' ? item.seller.name : item.seller
 
               return (
                 <article key={item.id} className="auction-card">
-                  {/* CARD HEADER & THUMBNAIL */}
-                  <div className="card-media-banner" style={{ borderTop: `4px solid ${item.accentColor}` }}>
-                    <div className="media-visual-box">
-                      <span className="media-item-emoji">{item.icon}</span>
-                    </div>
+                  {/* CARD HEADER & THUMBNAIL (Clickable to detail page) */}
+                  <Link to={`/auctions/${item.id}`} className="card-media-banner-link">
+                    <div className="card-media-banner" style={{ borderTop: `4px solid ${item.accentColor}` }}>
+                      <div className="media-visual-box">
+                        <span className="media-item-emoji">{item.icon}</span>
+                      </div>
 
-                    <div className="card-top-badges">
-                      <span className="badge-category">{item.categoryName}</span>
-                      <span className="badge-condition">{item.condition}</span>
-                    </div>
+                      <div className="card-top-badges">
+                        <span className="badge-category">{item.categoryName}</span>
+                        <span className="badge-condition">{item.condition}</span>
+                      </div>
 
-                    {item.tag && (
-                      <span className={`badge-status-tag ${item.tag === 'Ending Soon' ? 'urgent' : ''}`}>
-                        {item.tag}
-                      </span>
-                    )}
-                  </div>
+                      {item.tag && (
+                        <span className={`badge-status-tag ${item.tag === 'Ending Soon' ? 'urgent' : ''}`}>
+                          {item.tag}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
 
                   {/* CARD BODY */}
                   <div className="card-body">
-                    <h3 className="card-title" title={item.title}>
-                      {item.title}
-                    </h3>
+                    <Link to={`/auctions/${item.id}`} className="card-title-link">
+                      <h3 className="card-title" title={item.title}>
+                        {item.title}
+                      </h3>
+                    </Link>
 
                     {/* SELLER & LOCATION */}
                     <div className="card-seller-row">
                       <span className="seller-name">
-                        👤 {item.seller}
+                        👤 {sellerName}
                         {item.verifiedStudent && <span className="verified-check" title="Verified Campus Student">✓</span>}
                       </span>
                       <span className="seller-location">📍 {item.campusLocation}</span>
