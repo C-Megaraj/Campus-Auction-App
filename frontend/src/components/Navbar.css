@@ -101,6 +101,22 @@
   color: var(--accent);
 }
 
+.nav-watchlist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.watchlist-counter-badge {
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
 .navbar-right {
   display: flex;
   align-items: center;

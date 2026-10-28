@@ -505,3 +505,52 @@ export const SAMPLE_AUCTIONS = [
   },
 ]
 
+const CUSTOM_LISTINGS_KEY = 'campus_auction_custom_listings'
+
+// Retrieve user-created demo listings from localStorage
+export function getCustomAuctions() {
+  try {
+    const data = localStorage.getItem(CUSTOM_LISTINGS_KEY)
+    return data ? JSON.parse(data) : []
+  } catch (err) {
+    console.error('Error reading custom listings from localStorage:', err)
+    return []
+  }
+}
+
+// Retrieve combined list of custom + sample mock auctions
+export function getAllAuctions() {
+  const custom = getCustomAuctions()
+  return [...custom, ...SAMPLE_AUCTIONS]
+}
+
+// Add a newly created auction to localStorage and notify listeners
+export function addCustomAuction(auctionData) {
+  try {
+    const existing = getCustomAuctions()
+    const newAuction = {
+      ...auctionData,
+      id: `auc-user-${Date.now()}`,
+      currentBid: Number(auctionData.startingBid),
+      startingBid: Number(auctionData.startingBid),
+      minIncrement: Number(auctionData.minIncrement || 1),
+      bidsCount: 0,
+      verifiedStudent: true,
+      tag: 'New Listing',
+      bids: [],
+    }
+    const updated = [newAuction, ...existing]
+    localStorage.setItem(CUSTOM_LISTINGS_KEY, JSON.stringify(updated))
+    window.dispatchEvent(new Event('auctions-updated'))
+    return newAuction
+  } catch (err) {
+    console.error('Error adding custom listing to localStorage:', err)
+    return null
+  }
+}
+
+// Get single auction by ID from all sources
+export function getAuctionById(id) {
+  const all = getAllAuctions()
+  return all.find((item) => item.id === id) || null
+}

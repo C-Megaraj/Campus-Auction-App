@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  SAMPLE_AUCTIONS,
+  getAllAuctions,
   CATEGORIES,
   CONDITIONS,
   SORT_OPTIONS,
 } from '../utils/mockAuctions'
+import AuctionCard from '../components/AuctionCard'
 import './Home.css'
 
 export default function Home() {
+  const [allAuctions, setAllAuctions] = useState(getAllAuctions())
+
   // Filter & Search States
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -16,9 +19,16 @@ export default function Home() {
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [sortBy, setSortBy] = useState('closing-soon')
-  
+
   // Real-time ticking state (seconds elapsed)
   const [secondsElapsed, setSecondsElapsed] = useState(0)
+
+  // Listen for user listing creations in localStorage
+  useEffect(() => {
+    const handleUpdate = () => setAllAuctions(getAllAuctions())
+    window.addEventListener('auctions-updated', handleUpdate)
+    return () => window.removeEventListener('auctions-updated', handleUpdate)
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -27,74 +37,52 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
-  // Calculate live formatted remaining time for each item
-  const formatTimeRemaining = (initialMinutes) => {
-    const totalSeconds = initialMinutes * 60 - secondsElapsed
-    if (totalSeconds <= 0) return { text: 'Auction Closed', isUrgent: false, isEnded: true }
-
-    const days = Math.floor(totalSeconds / 86400)
-    const hours = Math.floor((totalSeconds % 86400) / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-
-    const isUrgent = totalSeconds < 3600 // Less than 1 hour
-
-    let text = ''
-    if (days > 0) {
-      text = `${days}d ${hours}h ${minutes}m left`
-    } else if (hours > 0) {
-      text = `${hours}h ${minutes}m ${seconds}s left`
-    } else {
-      text = `${minutes}m ${seconds}s left`
-    }
-
-    return { text, isUrgent, isEnded: false }
-  }
-
   // Multi-filter logic: Title search, Category, Condition, Min Price, Max Price
-  const filteredAuctions = SAMPLE_AUCTIONS.filter((auction) => {
-    // 1. Search bar filters by item title
-    const matchesTitle =
-      !searchQuery.trim() ||
-      auction.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  const filteredAuctions = allAuctions
+    .filter((auction) => {
+      // 1. Search bar filters by item title
+      const matchesTitle =
+        !searchQuery.trim() ||
+        auction.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
 
-    // 2. Category filter (Books, Electronics, Cycles, Other Items)
-    const matchesCategory =
-      selectedCategory === 'all' || auction.category === selectedCategory
+      // 2. Category filter (Books, Electronics, Cycles, Other Items)
+      const matchesCategory =
+        selectedCategory === 'all' || auction.category === selectedCategory
 
-    // 3. Condition filter (New, Like New, Good, Fair)
-    const matchesCondition =
-      selectedCondition === 'all' || auction.condition === selectedCondition
+      // 3. Condition filter (New, Like New, Good, Fair)
+      const matchesCondition =
+        selectedCondition === 'all' || auction.condition === selectedCondition
 
-    // 4. Price filter (Min and Max price)
-    const minVal = minPrice !== '' ? Number(minPrice) : null
-    const maxVal = maxPrice !== '' ? Number(maxPrice) : null
+      // 4. Price filter (Min and Max price)
+      const minVal = minPrice !== '' ? Number(minPrice) : null
+      const maxVal = maxPrice !== '' ? Number(maxPrice) : null
 
-    const matchesMinPrice =
-      minVal === null || isNaN(minVal) || auction.currentBid >= minVal
-    const matchesMaxPrice =
-      maxVal === null || isNaN(maxVal) || auction.currentBid <= maxVal
+      const matchesMinPrice =
+        minVal === null || isNaN(minVal) || auction.currentBid >= minVal
+      const matchesMaxPrice =
+        maxVal === null || isNaN(maxVal) || auction.currentBid <= maxVal
 
-    return (
-      matchesTitle &&
-      matchesCategory &&
-      matchesCondition &&
-      matchesMinPrice &&
-      matchesMaxPrice
-    )
-  }).sort((a, b) => {
-    // 5. Sorting options
-    if (sortBy === 'closing-soon') {
-      return a.initialMinutesLeft - b.initialMinutesLeft
-    }
-    if (sortBy === 'price-low-high') {
-      return a.currentBid - b.currentBid
-    }
-    if (sortBy === 'price-high-low') {
-      return b.currentBid - a.currentBid
-    }
-    return 0
-  })
+      return (
+        matchesTitle &&
+        matchesCategory &&
+        matchesCondition &&
+        matchesMinPrice &&
+        matchesMaxPrice
+      )
+    })
+    .sort((a, b) => {
+      // 5. Sorting options
+      if (sortBy === 'closing-soon') {
+        return a.initialMinutesLeft - b.initialMinutesLeft
+      }
+      if (sortBy === 'price-low-high') {
+        return a.currentBid - b.currentBid
+      }
+      if (sortBy === 'price-high-low') {
+        return b.currentBid - a.currentBid
+      }
+      return 0
+    })
 
   // Check if any filters are active
   const isFilterActive =
@@ -189,8 +177,8 @@ export default function Home() {
           {CATEGORIES.map((cat) => {
             const count =
               cat.id === 'all'
-                ? SAMPLE_AUCTIONS.length
-                : SAMPLE_AUCTIONS.filter((a) => a.category === cat.id).length
+                ? allAuctions.length
+                : allAuctions.filter((a) => a.category === cat.id).length
 
             return (
               <button
@@ -316,8 +304,8 @@ export default function Home() {
       {/* AUCTION CARDS GRID */}
       <section className="auction-grid-section">
         <div className="results-meta-bar">
-          <span className="results-count-text">
-            Showing <strong>{filteredAuctions.length}</strong> {filteredAuctions.length === 1 ? 'item' : 'items'}
+          <div className="results-count-text">
+            <span>Showing <strong>{filteredAuctions.length}</strong> {filteredAuctions.length === 1 ? 'item' : 'items'}</span>
             {selectedCategory !== 'all' && (
               <span className="active-tag-chip">
                 Category: <strong>{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</strong>
@@ -338,7 +326,7 @@ export default function Home() {
                 Title: <strong>"{searchQuery}"</strong>
               </span>
             )}
-          </span>
+          </div>
 
           {isFilterActive && (
             <button
@@ -346,7 +334,7 @@ export default function Home() {
               className="btn-reset-filters"
               onClick={handleResetFilters}
             >
-              Clear All
+              Clear All Filters
             </button>
           )}
         </div>
@@ -375,86 +363,13 @@ export default function Home() {
           </div>
         ) : (
           <div className="auction-grid">
-            {filteredAuctions.map((item) => {
-              const time = formatTimeRemaining(item.initialMinutesLeft)
-              const sellerName = typeof item.seller === 'object' ? item.seller.name : item.seller
-
-              return (
-                <article key={item.id} className="auction-card">
-                  {/* CARD HEADER & THUMBNAIL (Clickable to detail page) */}
-                  <Link to={`/auctions/${item.id}`} className="card-media-banner-link">
-                    <div className="card-media-banner" style={{ borderTop: `4px solid ${item.accentColor}` }}>
-                      <div className="media-visual-box">
-                        <span className="media-item-emoji">{item.icon}</span>
-                      </div>
-
-                      <div className="card-top-badges">
-                        <span className="badge-category">{item.categoryName}</span>
-                        <span className="badge-condition">{item.condition}</span>
-                      </div>
-
-                      {item.tag && (
-                        <span className={`badge-status-tag ${item.tag === 'Ending Soon' ? 'urgent' : ''}`}>
-                          {item.tag}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-
-                  {/* CARD BODY */}
-                  <div className="card-body">
-                    <Link to={`/auctions/${item.id}`} className="card-title-link">
-                      <h3 className="card-title" title={item.title}>
-                        {item.title}
-                      </h3>
-                    </Link>
-
-                    {/* SELLER & LOCATION */}
-                    <div className="card-seller-row">
-                      <span className="seller-name">
-                        👤 {sellerName}
-                        {item.verifiedStudent && <span className="verified-check" title="Verified Campus Student">✓</span>}
-                      </span>
-                      <span className="seller-location">📍 {item.campusLocation}</span>
-                    </div>
-
-                    {/* TIME REMAINING TIMER */}
-                    <div className={`countdown-bar ${time.isUrgent ? 'urgent' : ''}`}>
-                      <span className="timer-icon">{time.isUrgent ? '🔥' : '⏳'}</span>
-                      <span className="timer-text">{time.text}</span>
-                    </div>
-
-                    {/* PRICE & BID METRICS */}
-                    <div className="card-price-grid">
-                      <div className="price-box">
-                        <span className="price-label">Current Bid</span>
-                        <div className="price-value-row">
-                          <span className="currency-symbol">$</span>
-                          <span className="price-number">{item.currentBid}</span>
-                        </div>
-                      </div>
-
-                      <div className="bids-stat-box">
-                        <span className="bids-label">Activity</span>
-                        <span className="bids-count-tag">{item.bidsCount} bids</span>
-                        <span className="min-inc-text">+${item.minIncrement} min</span>
-                      </div>
-                    </div>
-
-                    {/* ACTION BUTTONS */}
-                    <div className="card-footer-actions">
-                      <Link to={`/auctions/${item.id}`} className="btn-card-bid">
-                        <span>Place Bid</span>
-                        <span className="bid-arrow">→</span>
-                      </Link>
-                      <Link to={`/auctions/${item.id}`} className="btn-card-details" title="View details">
-                        Details
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
+            {filteredAuctions.map((item) => (
+              <AuctionCard
+                key={item.id}
+                auction={item}
+                secondsElapsed={secondsElapsed}
+              />
+            ))}
           </div>
         )}
       </section>

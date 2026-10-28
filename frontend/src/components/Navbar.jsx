@@ -1,20 +1,25 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useWatchlist } from '../context/WatchlistContext'
 import './Navbar.css'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
+  const { watchlistCount } = useWatchlist()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogout = () => {
     logout()
     navigate('/')
   }
 
+  const isHome = location.pathname === '/'
+
   return (
     <header className="navbar-wrapper">
       <div className="navbar-top-banner">
-        <span>📍 Exclusive to Verified Campus Students • No Listing Fees • Safe Campus Handoff</span>
+        <span>📍 Exclusive to Verified Campus Students • 0% Listing Fees • Safe Campus Handoff</span>
       </div>
       <nav className="navbar">
         <div className="navbar-left">
@@ -28,10 +33,15 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-links">
-          <Link to="/" className="nav-link active">Home</Link>
-          <Link to="/auctions" className="nav-link">Browse Auctions</Link>
-          <a href="#categories" className="nav-link">Categories</a>
-          <a href="#how-it-works" className="nav-link">How It Works</a>
+          <Link to="/" className={`nav-link ${isHome ? 'active' : ''}`}>Explore</Link>
+          <Link to="/watchlist" className={`nav-link nav-watchlist-link ${location.pathname === '/watchlist' ? 'active' : ''}`}>
+            <span>❤️ Watchlist</span>
+            {watchlistCount > 0 && (
+              <span className="watchlist-counter-badge">{watchlistCount}</span>
+            )}
+          </Link>
+          <a href="/#categories" className="nav-link">Categories</a>
+          <a href="/#how-it-works" className="nav-link">How It Works</a>
         </div>
 
         <div className="navbar-right">

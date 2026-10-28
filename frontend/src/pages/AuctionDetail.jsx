@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { SAMPLE_AUCTIONS } from '../utils/mockAuctions'
+import { getAuctionById } from '../utils/mockAuctions'
+import { useWatchlist } from '../context/WatchlistContext'
 import './AuctionDetail.css'
 
 export default function AuctionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { isWatched, toggleWatchlist } = useWatchlist()
 
   // State for active photo gallery selection
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
@@ -17,8 +19,9 @@ export default function AuctionDetail() {
   const [biddingNotice, setBiddingNotice] = useState(null)
   const [customBidAmount, setCustomBidAmount] = useState('')
 
-  // Find the auction from shared mock data
-  const auction = SAMPLE_AUCTIONS.find((item) => item.id === id)
+  // Find the auction from all sources (custom listings + standard mock)
+  const auction = getAuctionById(id)
+  const watched = auction ? isWatched(auction.id) : false
 
   // Real-time ticking effect
   useEffect(() => {
@@ -112,6 +115,16 @@ export default function AuctionDetail() {
             {auction.title}
           </span>
         </div>
+
+        {/* WATCHLIST TOGGLE IN NAV */}
+        <button
+          type="button"
+          className={`btn-detail-watchlist ${watched ? 'active' : ''}`}
+          onClick={() => toggleWatchlist(auction.id)}
+          title={watched ? 'Remove from Watchlist' : 'Save to Watchlist'}
+        >
+          <span>{watched ? '❤️ Saved to Watchlist' : '🤍 Save to Watchlist'}</span>
+        </button>
       </nav>
 
       {/* FUTURE BIDDING NOTIFICATION BANNER */}
@@ -204,7 +217,7 @@ export default function AuctionDetail() {
               <div>
                 <h2 className="info-card-heading">Public Bid History</h2>
                 <p className="bid-history-subtitle">
-                  {auction.bidsCount} total bids placed by student peers
+                  {auction.bidsCount || 0} total {auction.bidsCount === 1 ? 'bid' : 'bids'} placed by student peers
                 </p>
               </div>
               <span className="live-activity-pill">
@@ -309,14 +322,14 @@ export default function AuctionDetail() {
             <div className="pricing-summary-card">
               <div className="current-bid-row">
                 <div>
-                  <span className="price-tagline">Current Highest Bid</span>
+                  <span className="price-tagline">{isEnded ? 'Final Highest Bid' : 'Current Highest Bid'}</span>
                   <div className="price-main-display">
                     <span className="currency">$</span>
                     <span className="amount">{auction.currentBid.toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="activity-badge-box">
-                  <span className="bids-tally">{auction.bidsCount} bids</span>
+                  <span className="bids-tally">{auction.bidsCount || 0} {auction.bidsCount === 1 ? 'bid' : 'bids'}</span>
                   <span className="min-inc-note">+${auction.minIncrement} increment</span>
                 </div>
               </div>

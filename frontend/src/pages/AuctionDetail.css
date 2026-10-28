@@ -84,6 +84,34 @@
   white-space: nowrap;
 }
 
+.btn-detail-watchlist {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.btn-detail-watchlist:hover {
+  border-color: #f43f5e;
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.btn-detail-watchlist.active {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
 /* BIDDING NOTIFICATION ALERT */
 .bidding-alert-banner {
   background: #f0fdf4;
