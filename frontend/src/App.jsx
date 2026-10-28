@@ -24,7 +24,14 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/auctions" element={<Home />} />
             <Route path="/auctions/:id" element={<AuctionDetail />} />
-            <Route path="/auctions/create" element={<CreateAuction />} />
+            <Route
+              path="/auctions/create"
+              element={
+                <ProtectedRoute>
+                  <CreateAuction />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

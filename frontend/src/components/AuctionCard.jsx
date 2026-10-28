@@ -6,9 +6,16 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
   const { isWatched, toggleWatchlist } = useWatchlist()
   const watched = isWatched(auction.id)
 
-  // Calculate live formatted remaining time
-  const totalSeconds = (auction.initialMinutesLeft * 60) - secondsElapsed
-  const isEnded = totalSeconds <= 0
+  // Calculate live formatted remaining time (handles both closing_at from MySQL API and initialMinutesLeft from demo)
+  let totalSeconds = 0
+  if (auction.closing_at) {
+    const closingTimeMs = new Date(auction.closing_at).getTime()
+    totalSeconds = Math.floor((closingTimeMs - Date.now()) / 1000)
+  } else if (typeof auction.initialMinutesLeft === 'number') {
+    totalSeconds = (auction.initialMinutesLeft * 60) - secondsElapsed
+  }
+
+  const isEnded = totalSeconds <= 0 || auction.status === 'ended' || auction.status === 'sold' || auction.status === 'closed'
   const isUrgent = !isEnded && totalSeconds < 3600
 
   const days = Math.floor(Math.max(0, totalSeconds) / 86400)
@@ -33,7 +40,7 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
   if (isEnded) {
     statusLabel = 'Closed'
     statusClass = 'status-closed'
-  } else if (isUrgent) {
+  } else if (isUrgent || auction.status === 'closing_soon') {
     statusLabel = 'Closing Soon'
     statusClass = 'status-urgent'
   } else if (auction.tag) {
@@ -41,7 +48,26 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
     statusClass = 'status-tag'
   }
 
-  const sellerName = typeof auction.seller === 'object' ? auction.seller.name : auction.seller
+  // Normalize data between API (snake_case) and mock (camelCase)
+  const currentBid = Number(auction.current_bid ?? auction.currentBid ?? auction.starting_price ?? auction.startingBid ?? 0)
+  const startingBid = Number(auction.starting_price ?? auction.startingBid ?? 0)
+  const bidsCount = Number(auction.bids_count ?? auction.bidsCount ?? 0)
+  const categoryName = auction.category_name || auction.categoryName || 'Item'
+  const sellerName = typeof auction.seller === 'object' ? (auction.seller?.name || 'Campus Student') : (auction.seller || 'Campus Student')
+  const isVerifiedStudent = typeof auction.seller === 'object'
+    ? (auction.seller?.verification_status === 'verified' || auction.seller?.verified)
+    : Boolean(auction.verifiedStudent)
+  const campusLocation = auction.campusLocation || 'Campus Pickup Spot'
+
+  const fallbackIcon = categoryName.toLowerCase().includes('book')
+    ? '📚'
+    : categoryName.toLowerCase().includes('electr')
+    ? '💻'
+    : categoryName.toLowerCase().includes('cycl')
+    ? '🚲'
+    : '📦'
+  const itemIcon = auction.icon || fallbackIcon
+  const primaryImageUrl = auction.primary_image_url || (auction.images && auction.images[0]?.image_url) || null
 
   const handleWatchlistClick = (e) => {
     e.preventDefault()
@@ -55,7 +81,25 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
       <div className="card-media-wrapper" style={{ borderTop: `4px solid ${auction.accentColor || 'var(--accent)'}` }}>
         <Link to={`/auctions/${auction.id}`} className="card-visual-link">
           <div className="media-preview-box">
-            <span className="media-item-emoji">{auction.icon || '📦'}</span>
+            {primaryImageUrl ? (
+              <img
+                src={primaryImageUrl}
+                alt={auction.title}
+                className="media-item-img"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  if (e.currentTarget.nextSibling) {
+                    e.currentTarget.nextSibling.style.display = 'inline'
+                  }
+                }}
+              />
+            ) : null}
+            <span
+              className="media-item-emoji"
+              style={primaryImageUrl ? { display: 'none' } : {}}
+            >
+              {itemIcon}
+            </span>
           </div>
         </Link>
 
@@ -72,7 +116,7 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
 
         {/* BADGES ROW */}
         <div className="card-badges-row">
-          <span className="card-badge category-pill-tag">{auction.categoryName}</span>
+          <span className="card-badge category-pill-tag">{categoryName}</span>
           <span className="card-badge condition-pill-tag">{auction.condition}</span>
         </div>
 
@@ -95,9 +139,9 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
         <div className="card-seller-info-row">
           <span className="seller-name-text">
             👤 {sellerName}
-            {auction.verifiedStudent && <span className="verified-check-bubble" title="Verified Campus Student">✓</span>}
+            {isVerifiedStudent && <span className="verified-check-bubble" title="Verified Campus Student">✓</span>}
           </span>
-          <span className="seller-location-text">📍 {auction.campusLocation}</span>
+          <span className="seller-location-text">📍 {campusLocation}</span>
         </div>
 
         {/* COUNTDOWN TIMER */}
@@ -112,13 +156,13 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
             <span className="price-caption">{isEnded ? 'Final Bid' : 'Highest Bid'}</span>
             <div className="price-figure-row">
               <span className="currency-mark">$</span>
-              <span className="price-digits">{auction.currentBid}</span>
+              <span className="price-digits">{currentBid.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="price-secondary-col">
-            <span className="bids-count-bubble">{auction.bidsCount || 0} {auction.bidsCount === 1 ? 'bid' : 'bids'}</span>
-            <span className="starting-bid-label">Starts at ${auction.startingBid}</span>
+            <span className="bids-count-bubble">{bidsCount} {bidsCount === 1 ? 'bid' : 'bids'}</span>
+            <span className="starting-bid-label">Starts at ${startingBid.toFixed(2)}</span>
           </div>
         </div>
 
@@ -136,4 +180,3 @@ export default function AuctionCard({ auction, secondsElapsed = 0 }) {
     </article>
   )
 }
-

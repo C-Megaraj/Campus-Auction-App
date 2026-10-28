@@ -1,13 +1,31 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getAuctionById } from '../utils/mockAuctions'
+import { fetchListingById } from '../services/api'
 import { useWatchlist } from '../context/WatchlistContext'
 import './AuctionDetail.css'
+
+function formatTimeAgo(dateString) {
+  if (!dateString) return 'Recent'
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return String(dateString)
+  const diffSecs = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (diffSecs < 60) return 'Just now'
+  if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`
+  if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}h ago`
+  return `${Math.floor(diffSecs / 86400)}d ago`
+}
 
 export default function AuctionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { isWatched, toggleWatchlist } = useWatchlist()
+
+  // Data fetching states
+  const [auction, setAuction] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [isNotFound, setIsNotFound] = useState(false)
 
   // State for active photo gallery selection
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
@@ -19,9 +37,50 @@ export default function AuctionDetail() {
   const [biddingNotice, setBiddingNotice] = useState(null)
   const [customBidAmount, setCustomBidAmount] = useState('')
 
-  // Find the auction from all sources (custom listings + standard mock)
-  const auction = getAuctionById(id)
-  const watched = auction ? isWatched(auction.id) : false
+  // Fetch listing by ID from API
+  const loadListing = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    setIsNotFound(false)
+
+    try {
+      const data = await fetchListingById(id)
+      if (data && data.success && data.listing) {
+        setAuction(data.listing)
+      } else {
+        setIsNotFound(true)
+      }
+    } catch (err) {
+      console.error('Error fetching listing details:', err)
+      if (err.response?.status === 404) {
+        // Check if it exists in mock / local storage auctions as a fallback
+        const mockFallback = getAuctionById(id)
+        if (mockFallback) {
+          setAuction(mockFallback)
+        } else {
+          setIsNotFound(true)
+        }
+      } else {
+        // Network or server error: check if mock has it or show error
+        const mockFallback = getAuctionById(id)
+        if (mockFallback) {
+          setAuction(mockFallback)
+        } else {
+          setError(
+            err.response?.data?.message ||
+            err.message ||
+            'Unable to connect to the backend server. Please verify the Express API and MySQL database are running.'
+          )
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    loadListing()
+  }, [loadListing])
 
   // Real-time ticking effect
   useEffect(() => {
@@ -31,14 +90,55 @@ export default function AuctionDetail() {
     return () => clearInterval(timer)
   }, [])
 
+  // If loading, show clean loading state
+  if (loading) {
+    return (
+      <div className="auction-detail-container">
+        <nav className="detail-navigation-bar">
+          <button onClick={() => navigate('/')} className="btn-back-nav">
+            <span className="back-arrow">←</span>
+            <span>Back to Auctions</span>
+          </button>
+        </nav>
+        <div className="api-loading-state" style={{ margin: '3rem auto', maxWidth: '600px' }}>
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Loading auction details from database...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If server error occurred and no fallback found
+  if (error && !auction) {
+    return (
+      <div className="auction-detail-container not-found-wrapper">
+        <div className="api-error-card" style={{ maxWidth: '600px', margin: '3rem auto' }}>
+          <div className="api-error-header">
+            <span className="error-icon">⚠️</span>
+            <h3>Unable to Load Auction</h3>
+          </div>
+          <p className="error-description">{error}</p>
+          <div className="error-actions">
+            <button type="button" className="btn-retry-api" onClick={loadListing}>
+              🔄 Retry Connection
+            </button>
+            <button onClick={() => navigate('/')} className="btn-back-secondary">
+              ← Back to Auctions
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // If auction not found, show friendly 404 card with back button
-  if (!auction) {
+  if (isNotFound || !auction) {
     return (
       <div className="auction-detail-container not-found-wrapper">
         <div className="not-found-card">
           <span className="not-found-icon">🔎</span>
           <h2>Auction Not Found</h2>
-          <p>The auction item you are looking for does not exist or may have been removed.</p>
+          <p>The auction item you are looking for (ID: {id}) does not exist in the database or may have been removed.</p>
           <button onClick={() => navigate('/')} className="btn-back-home">
             ← Back to Auctions
           </button>
@@ -47,9 +147,24 @@ export default function AuctionDetail() {
     )
   }
 
+  const watched = isWatched(auction.id)
+
   // Calculate live formatted remaining time
-  const totalSeconds = (auction.initialMinutesLeft * 60) - secondsElapsed
-  const isEnded = totalSeconds <= 0
+  let totalSeconds = 0
+  let closingDateObj = null
+
+  if (auction.closing_at) {
+    closingDateObj = new Date(auction.closing_at)
+    totalSeconds = Math.floor((closingDateObj.getTime() - Date.now()) / 1000)
+  } else if (typeof auction.initialMinutesLeft === 'number') {
+    closingDateObj = new Date(Date.now() + auction.initialMinutesLeft * 60 * 1000)
+    totalSeconds = (auction.initialMinutesLeft * 60) - secondsElapsed
+  } else {
+    closingDateObj = new Date()
+    totalSeconds = 0
+  }
+
+  const isEnded = totalSeconds <= 0 || auction.status === 'ended' || auction.status === 'sold' || auction.status === 'closed'
   const isUrgent = !isEnded && totalSeconds < 3600
 
   const days = Math.floor(Math.max(0, totalSeconds) / 86400)
@@ -57,37 +172,90 @@ export default function AuctionDetail() {
   const minutes = Math.floor((Math.max(0, totalSeconds) % 3600) / 60)
   const seconds = Math.max(0, totalSeconds) % 60
 
-  // Calculate closing date/time based on current time + initialMinutesLeft
-  const closingDate = new Date(Date.now() + auction.initialMinutesLeft * 60 * 1000)
-  const formattedClosingDate = closingDate.toLocaleDateString('en-US', {
+  const formattedClosingDate = closingDateObj.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
-  const formattedClosingTime = closingDate.toLocaleTimeString('en-US', {
+  const formattedClosingTime = closingDateObj.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
   })
 
-  // Seller details normalization
-  const seller = typeof auction.seller === 'object'
-    ? auction.seller
+  // Normalize prices & increments
+  const currentBid = Number(auction.current_bid ?? auction.currentBid ?? auction.starting_price ?? auction.startingBid ?? 0)
+  const startingBid = Number(auction.starting_price ?? auction.startingBid ?? 0)
+  const minIncrement = Number(auction.minimum_bid_increment ?? auction.minIncrement ?? 1)
+  const bidsCount = Number(auction.bids_count ?? auction.bidsCount ?? (auction.bids?.length || 0))
+  const nextMinimumBid = currentBid + minIncrement
+
+  const categoryName = auction.category_name || auction.categoryName || 'Item'
+
+  // Normalize Seller details
+  const sellerObj = typeof auction.seller === 'object' && auction.seller !== null
+    ? {
+        name: auction.seller.name || 'Campus Student',
+        major: auction.seller.major || 'Undergraduate Student',
+        gradYear: auction.seller.gradYear || "'25",
+        rating: auction.seller.rating || '4.9',
+        reviewsCount: auction.seller.reviewsCount || 15,
+        verified: auction.seller.verification_status === 'verified' || Boolean(auction.seller.verified),
+        pickupSpot: auction.seller.pickupSpot || auction.campusLocation || 'Student Center & Library Quad',
+      }
     : {
-        name: auction.seller,
+        name: String(auction.seller || 'Campus Student'),
         major: 'Undergraduate Student',
         gradYear: "'25",
         rating: '4.9',
         reviewsCount: 15,
         verified: true,
-        pickupSpot: auction.campusLocation,
+        pickupSpot: auction.campusLocation || 'Student Center & Library Quad',
       }
 
-  const nextMinimumBid = auction.currentBid + auction.minIncrement
-  const photos = auction.photos || [
-    { id: 'p1', label: 'Primary Item View', icon: auction.icon, bg: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' },
-  ]
+  // Normalize Photos
+  const defaultIcon = categoryName.toLowerCase().includes('book')
+    ? '📚'
+    : categoryName.toLowerCase().includes('electr')
+    ? '💻'
+    : categoryName.toLowerCase().includes('cycl')
+    ? '🚲'
+    : '📦'
+
+  let photos = []
+  if (Array.isArray(auction.images) && auction.images.length > 0) {
+    photos = auction.images.map((img, idx) => ({
+      id: img.id || `img-${idx}`,
+      url: img.image_url,
+      label: img.is_primary ? 'Primary View' : `Photo #${idx + 1}`,
+      icon: defaultIcon,
+      bg: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+    }))
+  } else if (Array.isArray(auction.photos) && auction.photos.length > 0) {
+    photos = auction.photos
+  } else {
+    photos = [
+      {
+        id: 'p1',
+        url: auction.primary_image_url || null,
+        label: 'Primary Item View',
+        icon: auction.icon || defaultIcon,
+        bg: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+      },
+    ]
+  }
   const activePhoto = photos[activePhotoIndex] || photos[0]
+
+  // Normalize Bids
+  const bids = Array.isArray(auction.bids)
+    ? auction.bids.map((b, idx) => ({
+        id: b.id || `b-${idx}`,
+        bidderName: b.bidder_name || b.bidderName || `Student Bidder`,
+        amount: Number(b.amount),
+        timeAgo: b.timeAgo || formatTimeAgo(b.created_at),
+        isWinning: b.is_winning !== undefined ? Boolean(b.is_winning) : (b.isWinning !== undefined ? Boolean(b.isWinning) : idx === 0),
+      }))
+    : []
 
   // Handler for Place Bid button
   const handlePlaceBid = (e) => {
@@ -109,7 +277,7 @@ export default function AuctionDetail() {
         <div className="breadcrumb-trail">
           <Link to="/" className="breadcrumb-link">Home</Link>
           <span className="breadcrumb-separator">/</span>
-          <span className="breadcrumb-link">{auction.categoryName}</span>
+          <span className="breadcrumb-link">{categoryName}</span>
           <span className="breadcrumb-separator">/</span>
           <span className="breadcrumb-current" title={auction.title}>
             {auction.title}
@@ -159,20 +327,37 @@ export default function AuctionDetail() {
               className="main-photo-stage"
               style={{ background: activePhoto.bg || 'var(--code-bg)' }}
             >
-              <div className="photo-hero-graphic">
-                <span className="photo-hero-emoji">{activePhoto.icon || auction.icon}</span>
+              {activePhoto.url ? (
+                <img
+                  src={activePhoto.url}
+                  alt={auction.title}
+                  className="main-photo-stage-img"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                    if (e.currentTarget.nextSibling) {
+                      e.currentTarget.nextSibling.style.display = 'flex'
+                    }
+                  }}
+                />
+              ) : null}
+
+              <div
+                className="photo-hero-graphic"
+                style={activePhoto.url ? { display: 'none' } : {}}
+              >
+                <span className="photo-hero-emoji">{activePhoto.icon || defaultIcon}</span>
                 <span className="photo-caption-tag">{activePhoto.label}</span>
               </div>
 
               {/* Status and Category Badges */}
               <div className="photo-badges-overlay">
-                <span className="badge-tag category-badge">{auction.categoryName}</span>
+                <span className="badge-tag category-badge">{categoryName}</span>
                 <span className="badge-tag condition-badge">Condition: {auction.condition}</span>
-                {auction.tag && (
-                  <span className={`badge-tag status-badge ${auction.tag === 'Ending Soon' ? 'urgent' : ''}`}>
-                    {auction.tag}
-                  </span>
-                )}
+                {auction.status === 'closing_soon' || isUrgent ? (
+                  <span className="badge-tag status-badge urgent">Closing Soon</span>
+                ) : isEnded ? (
+                  <span className="badge-tag status-badge">Closed</span>
+                ) : null}
               </div>
             </div>
 
@@ -187,7 +372,11 @@ export default function AuctionDetail() {
                     onClick={() => setActivePhotoIndex(index)}
                     title={photo.label}
                   >
-                    <span className="thumb-icon">{photo.icon}</span>
+                    {photo.url ? (
+                      <img src={photo.url} alt={photo.label} className="thumb-img" />
+                    ) : (
+                      <span className="thumb-icon">{photo.icon || defaultIcon}</span>
+                    )}
                     <span className="thumb-label">{photo.label}</span>
                   </button>
                 ))}
@@ -206,7 +395,7 @@ export default function AuctionDetail() {
                 <strong className="condition-title">Verified Condition Notes</strong>
               </div>
               <p className="condition-detail-text">
-                {auction.conditionDescription || 'Inspected by seller. Described honestly according to student marketplace standards.'}
+                {auction.conditionDescription || 'Inspected by student seller. Described accurately according to campus marketplace standards.'}
               </p>
             </div>
           </div>
@@ -217,7 +406,7 @@ export default function AuctionDetail() {
               <div>
                 <h2 className="info-card-heading">Public Bid History</h2>
                 <p className="bid-history-subtitle">
-                  {auction.bidsCount || 0} total {auction.bidsCount === 1 ? 'bid' : 'bids'} placed by student peers
+                  {bidsCount} total {bidsCount === 1 ? 'bid' : 'bids'} placed by student peers
                 </p>
               </div>
               <span className="live-activity-pill">
@@ -225,7 +414,7 @@ export default function AuctionDetail() {
               </span>
             </div>
 
-            {auction.bids && auction.bids.length > 0 ? (
+            {bids.length > 0 ? (
               <div className="bid-history-table-wrapper">
                 <table className="bid-history-table">
                   <thead>
@@ -237,7 +426,7 @@ export default function AuctionDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {auction.bids.map((bid) => (
+                    {bids.map((bid) => (
                       <tr key={bid.id} className={bid.isWinning ? 'winning-row' : ''}>
                         <td>
                           <div className="bidder-cell">
@@ -325,23 +514,23 @@ export default function AuctionDetail() {
                   <span className="price-tagline">{isEnded ? 'Final Highest Bid' : 'Current Highest Bid'}</span>
                   <div className="price-main-display">
                     <span className="currency">$</span>
-                    <span className="amount">{auction.currentBid.toFixed(2)}</span>
+                    <span className="amount">{currentBid.toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="activity-badge-box">
-                  <span className="bids-tally">{auction.bidsCount || 0} {auction.bidsCount === 1 ? 'bid' : 'bids'}</span>
-                  <span className="min-inc-note">+${auction.minIncrement} increment</span>
+                  <span className="bids-tally">{bidsCount} {bidsCount === 1 ? 'bid' : 'bids'}</span>
+                  <span className="min-inc-note">+${minIncrement.toFixed(2)} increment</span>
                 </div>
               </div>
 
               <div className="price-breakdown-details">
                 <div className="price-detail-line">
                   <span className="label">Starting Price:</span>
-                  <span className="val">${auction.startingBid.toFixed(2)}</span>
+                  <span className="val">${startingBid.toFixed(2)}</span>
                 </div>
                 <div className="price-detail-line">
                   <span className="label">Minimum Bid Increment:</span>
-                  <span className="val">+${auction.minIncrement.toFixed(2)}</span>
+                  <span className="val">+${minIncrement.toFixed(2)}</span>
                 </div>
                 <div className="price-detail-line highlight">
                   <span className="label">Suggested Next Bid:</span>
@@ -398,19 +587,19 @@ export default function AuctionDetail() {
 
               <div className="seller-details-meta">
                 <div className="seller-name-row">
-                  <strong className="seller-display-name">{seller.name}</strong>
-                  {seller.verified && (
+                  <strong className="seller-display-name">{sellerObj.name}</strong>
+                  {sellerObj.verified && (
                     <span className="verified-badge-pill" title="Verified Campus Student">
                       ✓ Verified Student
                     </span>
                   )}
                 </div>
                 <p className="seller-education">
-                  {seller.major} • Class of {seller.gradYear}
+                  {sellerObj.major} • Class of {sellerObj.gradYear}
                 </p>
                 <div className="seller-reputation-row">
-                  <span className="seller-stars">★ {seller.rating}</span>
-                  <span className="seller-reviews">({seller.reviewsCount} campus reviews)</span>
+                  <span className="seller-stars">★ {sellerObj.rating}</span>
+                  <span className="seller-reviews">({sellerObj.reviewsCount} campus reviews)</span>
                   <span className="fast-responder-pill">⚡ Fast Responder</span>
                 </div>
               </div>
@@ -421,7 +610,7 @@ export default function AuctionDetail() {
               <div className="location-icon-box">📍</div>
               <div className="location-details">
                 <strong>Campus Pickup Location:</strong>
-                <p>{seller.pickupSpot || auction.campusLocation}</p>
+                <p>{sellerObj.pickupSpot}</p>
               </div>
             </div>
 

@@ -9,8 +9,8 @@ export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/')
   }
 
@@ -52,9 +52,12 @@ export default function Navbar() {
 
           {user ? (
             <div className="user-nav-group">
-              <Link to="/profile" className="user-profile-pill">
+              <Link to="/profile" className="user-profile-pill" title={user.email}>
                 <span className="user-avatar-circle">👤</span>
-                <span className="user-nav-name">{user.name}</span>
+                <span className="user-nav-name">{user.full_name || user.name}</span>
+                {user.student_verification_status === 'verified' && (
+                  <span className="verified-check-bubble" style={{ marginLeft: '4px' }} title="Verified Student">✓</span>
+                )}
               </Link>
               <button onClick={handleLogout} className="btn-nav-ghost">Logout</button>
             </div>

@@ -1,16 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAllAuctions,
   CATEGORIES,
   CONDITIONS,
   SORT_OPTIONS,
 } from '../utils/mockAuctions'
+import { fetchListings } from '../services/api'
 import AuctionCard from '../components/AuctionCard'
 import './Home.css'
 
 export default function Home() {
-  const [allAuctions, setAllAuctions] = useState(getAllAuctions())
+  const [listings, setListings] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Unfiltered baseline listings to compute category counts
+  const [categoryCounts, setCategoryCounts] = useState({})
+  const [totalCount, setTotalCount] = useState(0)
 
   // Filter & Search States
   const [searchQuery, setSearchQuery] = useState('')
@@ -23,66 +29,91 @@ export default function Home() {
   // Real-time ticking state (seconds elapsed)
   const [secondsElapsed, setSecondsElapsed] = useState(0)
 
-  // Listen for user listing creations in localStorage
-  useEffect(() => {
-    const handleUpdate = () => setAllAuctions(getAllAuctions())
-    window.addEventListener('auctions-updated', handleUpdate)
-    return () => window.removeEventListener('auctions-updated', handleUpdate)
+  // Debounce ref
+  const debounceTimerRef = useRef(null)
+
+  // Load baseline counts for categories
+  const loadBaselineCounts = useCallback(async () => {
+    try {
+      const data = await fetchListings()
+      if (data && data.success && Array.isArray(data.listings)) {
+        setTotalCount(data.listings.length)
+        const counts = {}
+        data.listings.forEach((item) => {
+          const catName = (item.category_name || item.category || '').toLowerCase()
+          if (catName.includes('book')) counts.books = (counts.books || 0) + 1
+          else if (catName.includes('electr')) counts.electronics = (counts.electronics || 0) + 1
+          else if (catName.includes('cycl')) counts.cycles = (counts.cycles || 0) + 1
+          else counts.other = (counts.other || 0) + 1
+        })
+        setCategoryCounts(counts)
+      }
+    } catch {
+      // Non-blocking baseline fetch
+    }
   }, [])
 
+  // Main fetch listings with query parameters
+  const loadAuctions = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const params = {}
+      if (searchQuery.trim()) params.search = searchQuery.trim()
+      if (selectedCategory !== 'all') params.category = selectedCategory
+      if (selectedCondition !== 'all') params.condition = selectedCondition
+      if (minPrice !== '') params.min_price = minPrice
+      if (maxPrice !== '') params.max_price = maxPrice
+      if (sortBy) params.sort = sortBy
+
+      const data = await fetchListings(params)
+      if (data && data.success) {
+        setListings(data.listings || [])
+      } else {
+        setError(data?.message || 'Failed to retrieve listings from server.')
+      }
+    } catch (err) {
+      console.error('Error fetching listings:', err)
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Unable to connect to the backend server. Please verify the Express API and MySQL database are running.'
+      setError(errorMsg)
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery, selectedCategory, selectedCondition, minPrice, maxPrice, sortBy])
+
+  // Debounce API calls for text/price inputs, immediate for dropdowns/pills
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      loadAuctions()
+    }, 250)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [loadAuctions])
+
+  // Initial mount: load category counts
+  useEffect(() => {
+    loadBaselineCounts()
+  }, [loadBaselineCounts])
+
+  // Live ticking timer
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsElapsed((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(timer)
   }, [])
-
-  // Multi-filter logic: Title search, Category, Condition, Min Price, Max Price
-  const filteredAuctions = allAuctions
-    .filter((auction) => {
-      // 1. Search bar filters by item title
-      const matchesTitle =
-        !searchQuery.trim() ||
-        auction.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
-
-      // 2. Category filter (Books, Electronics, Cycles, Other Items)
-      const matchesCategory =
-        selectedCategory === 'all' || auction.category === selectedCategory
-
-      // 3. Condition filter (New, Like New, Good, Fair)
-      const matchesCondition =
-        selectedCondition === 'all' || auction.condition === selectedCondition
-
-      // 4. Price filter (Min and Max price)
-      const minVal = minPrice !== '' ? Number(minPrice) : null
-      const maxVal = maxPrice !== '' ? Number(maxPrice) : null
-
-      const matchesMinPrice =
-        minVal === null || isNaN(minVal) || auction.currentBid >= minVal
-      const matchesMaxPrice =
-        maxVal === null || isNaN(maxVal) || auction.currentBid <= maxVal
-
-      return (
-        matchesTitle &&
-        matchesCategory &&
-        matchesCondition &&
-        matchesMinPrice &&
-        matchesMaxPrice
-      )
-    })
-    .sort((a, b) => {
-      // 5. Sorting options
-      if (sortBy === 'closing-soon') {
-        return a.initialMinutesLeft - b.initialMinutesLeft
-      }
-      if (sortBy === 'price-low-high') {
-        return a.currentBid - b.currentBid
-      }
-      if (sortBy === 'price-high-low') {
-        return b.currentBid - a.currentBid
-      }
-      return 0
-    })
 
   // Check if any filters are active
   const isFilterActive =
@@ -166,7 +197,7 @@ export default function Home() {
             <h2 className="section-title">Live Campus Auctions</h2>
             <p className="section-subtitle">Real-time bids from fellow students across dorms and departments</p>
           </div>
-          
+
           <Link to="/auctions/create" className="btn-secondary-list">
             <span>+ List an Item</span>
           </Link>
@@ -177,8 +208,8 @@ export default function Home() {
           {CATEGORIES.map((cat) => {
             const count =
               cat.id === 'all'
-                ? allAuctions.length
-                : allAuctions.filter((a) => a.category === cat.id).length
+                ? totalCount || listings.length
+                : categoryCounts[cat.id] ?? 0
 
             return (
               <button
@@ -303,9 +334,10 @@ export default function Home() {
 
       {/* AUCTION CARDS GRID */}
       <section className="auction-grid-section">
+        {/* RESULTS META BAR */}
         <div className="results-meta-bar">
           <div className="results-count-text">
-            <span>Showing <strong>{filteredAuctions.length}</strong> {filteredAuctions.length === 1 ? 'item' : 'items'}</span>
+            <span>Showing <strong>{listings.length}</strong> {listings.length === 1 ? 'item' : 'items'}</span>
             {selectedCategory !== 'all' && (
               <span className="active-tag-chip">
                 Category: <strong>{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</strong>
@@ -339,8 +371,61 @@ export default function Home() {
           )}
         </div>
 
-        {/* 6. FRIENDLY NO-RESULTS MESSAGE */}
-        {filteredAuctions.length === 0 ? (
+        {/* ERROR STATE WITH RETRY */}
+        {error && (
+          <div className="api-error-card">
+            <div className="api-error-header">
+              <span className="error-icon">⚠️</span>
+              <h3>Unable to Connect to Auction Server</h3>
+            </div>
+            <p className="error-description">
+              {error}
+            </p>
+            <div className="error-actions">
+              <button
+                type="button"
+                className="btn-retry-api"
+                onClick={loadAuctions}
+              >
+                🔄 Retry Connection
+              </button>
+              <button
+                type="button"
+                className="btn-reset-filters"
+                onClick={handleResetFilters}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* LOADING INDICATOR */}
+        {loading && !error && (
+          <div className="api-loading-state">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading live campus auctions from database...</p>
+          </div>
+        )}
+
+        {/* EMPTY STATE: Database contains no listings */}
+        {!loading && !error && listings.length === 0 && !isFilterActive && (
+          <div className="empty-results-card">
+            <span className="empty-icon">📦</span>
+            <h3>No Active Auctions Yet</h3>
+            <p>
+              There are currently no live auction listings in the database. Be the first student to list textbooks, dorm items, or gear!
+            </p>
+            <div className="empty-actions">
+              <Link to="/auctions/create" className="btn-hero-primary">
+                + List the First Item
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* EMPTY STATE: No items match active filters */}
+        {!loading && !error && listings.length === 0 && isFilterActive && (
           <div className="empty-results-card">
             <span className="empty-icon">🔍</span>
             <h3>No items match your selected filters</h3>
@@ -361,9 +446,12 @@ export default function Home() {
               </Link>
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* AUCTIONS GRID */}
+        {!loading && !error && listings.length > 0 && (
           <div className="auction-grid">
-            {filteredAuctions.map((item) => (
+            {listings.map((item) => (
               <AuctionCard
                 key={item.id}
                 auction={item}
