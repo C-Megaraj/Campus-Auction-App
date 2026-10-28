@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './Home.css'
 
-// Initial sample auction data representing diverse campus items
+// Mock auction data representing campus items across the 4 required categories
+// and 4 required conditions (New, Like New, Good, Fair)
 const SAMPLE_AUCTIONS = [
   {
     id: 'auc-1',
@@ -14,7 +15,6 @@ const SAMPLE_AUCTIONS = [
     startingBid: 30,
     minIncrement: 2,
     bidsCount: 14,
-    // Minutes remaining from page load for live ticking demo
     initialMinutesLeft: 42,
     seller: 'Alex M.',
     campusLocation: 'Engineering Quad • Hall A',
@@ -27,8 +27,8 @@ const SAMPLE_AUCTIONS = [
     id: 'auc-2',
     title: 'Organic Chemistry (Vollhardt & Schore 8th Ed) + Full Study Guide',
     category: 'books',
-    categoryName: 'Textbooks',
-    condition: 'Good (Clean notes)',
+    categoryName: 'Books',
+    condition: 'Good',
     currentBid: 45,
     startingBid: 20,
     minIncrement: 2,
@@ -44,9 +44,9 @@ const SAMPLE_AUCTIONS = [
   {
     id: 'auc-3',
     title: 'Trek FX 2 Disc Hybrid Commuter Bike (Medium Frame, with U-Lock)',
-    category: 'transport',
-    categoryName: 'Bikes & Transit',
-    condition: 'Excellent',
+    category: 'cycles',
+    categoryName: 'Cycles',
+    condition: 'Like New',
     currentBid: 195,
     startingBid: 120,
     minIncrement: 5,
@@ -64,7 +64,7 @@ const SAMPLE_AUCTIONS = [
     title: 'Dell UltraSharp 27" 4K USB-C Hub Monitor (Model U2720Q)',
     category: 'electronics',
     categoryName: 'Electronics',
-    condition: 'Mint / Original Box',
+    condition: 'New',
     currentBid: 230,
     startingBid: 150,
     minIncrement: 10,
@@ -80,8 +80,8 @@ const SAMPLE_AUCTIONS = [
   {
     id: 'auc-5',
     title: 'Compact Dorm Mini-Fridge with Top Freezer (3.2 cu. ft EnergyStar)',
-    category: 'dorm',
-    categoryName: 'Dorm & Living',
+    category: 'other',
+    categoryName: 'Other Items',
     condition: 'Good',
     currentBid: 58,
     startingBid: 25,
@@ -116,8 +116,8 @@ const SAMPLE_AUCTIONS = [
   {
     id: 'auc-7',
     title: 'Official Campus Championship Vintage Navy Hoodie (Size Large)',
-    category: 'clothing',
-    categoryName: 'Campus Merch',
+    category: 'other',
+    categoryName: 'Other Items',
     condition: 'Like New',
     currentBid: 32,
     startingBid: 15,
@@ -134,9 +134,9 @@ const SAMPLE_AUCTIONS = [
   {
     id: 'auc-8',
     title: 'Ergonomic High-Back Mesh Desk Chair with 3D Armrests',
-    category: 'dorm',
-    categoryName: 'Dorm & Living',
-    condition: 'Very Good',
+    category: 'other',
+    categoryName: 'Other Items',
+    condition: 'Good',
     currentBid: 82,
     startingBid: 40,
     minIncrement: 5,
@@ -149,21 +149,113 @@ const SAMPLE_AUCTIONS = [
     verifiedStudent: true,
     tag: 'Dorm Essential',
   },
+  {
+    id: 'auc-9',
+    title: 'Calculus: Early Transcendentals (Stewart 9th Edition Hardcover)',
+    category: 'books',
+    categoryName: 'Books',
+    condition: 'New',
+    currentBid: 75,
+    startingBid: 45,
+    minIncrement: 5,
+    bidsCount: 8,
+    initialMinutesLeft: 210,
+    seller: 'Maya J.',
+    campusLocation: 'Math Dept • East Hall',
+    icon: '📖',
+    accentColor: '#0284c7',
+    verifiedStudent: true,
+    tag: 'Brand New',
+  },
+  {
+    id: 'auc-10',
+    title: 'Vintage Raleigh 10-Speed Road Bicycle (Rideable, Solid Steel Frame)',
+    category: 'cycles',
+    categoryName: 'Cycles',
+    condition: 'Fair',
+    currentBid: 40,
+    startingBid: 25,
+    minIncrement: 2,
+    bidsCount: 15,
+    initialMinutesLeft: 18,
+    seller: 'Liam D.',
+    campusLocation: 'North Campus Bike Rack',
+    icon: '🚲',
+    accentColor: '#e11d48',
+    verifiedStudent: true,
+    tag: 'Ending Soon',
+  },
+  {
+    id: 'auc-11',
+    title: 'Logitech MX Master 3S Wireless Performance Mouse (Graphite)',
+    category: 'electronics',
+    categoryName: 'Electronics',
+    condition: 'Like New',
+    currentBid: 52,
+    startingBid: 30,
+    minIncrement: 2,
+    bidsCount: 12,
+    initialMinutesLeft: 95,
+    seller: 'David K.',
+    campusLocation: 'CS Computer Lab B',
+    icon: '🖱️',
+    accentColor: '#6366f1',
+    verifiedStudent: true,
+    tag: 'High Demand',
+  },
+  {
+    id: 'auc-12',
+    title: 'Dorm Multi-Angle Floor Lamp with Warm Reading Light',
+    category: 'other',
+    categoryName: 'Other Items',
+    condition: 'Fair',
+    currentBid: 16,
+    startingBid: 10,
+    minIncrement: 1,
+    bidsCount: 5,
+    initialMinutesLeft: 110,
+    seller: 'Emily R.',
+    campusLocation: 'West Tower Common Room',
+    icon: '💡',
+    accentColor: '#ca8a04',
+    verifiedStudent: true,
+    tag: 'Budget Pick',
+  },
 ]
 
+// 4 Required Categories + All
 const CATEGORIES = [
   { id: 'all', label: 'All Items', icon: '✨' },
-  { id: 'books', label: 'Textbooks', icon: '📚' },
+  { id: 'books', label: 'Books', icon: '📚' },
   { id: 'electronics', label: 'Electronics', icon: '💻' },
-  { id: 'dorm', label: 'Dorm & Living', icon: '🛋️' },
-  { id: 'transport', label: 'Bikes & Transit', icon: '🚲' },
-  { id: 'clothing', label: 'Campus Merch', icon: '👕' },
+  { id: 'cycles', label: 'Cycles', icon: '🚲' },
+  { id: 'other', label: 'Other Items', icon: '📦' },
+]
+
+// 4 Required Conditions + All
+const CONDITIONS = [
+  { id: 'all', label: 'All Conditions' },
+  { id: 'New', label: 'New' },
+  { id: 'Like New', label: 'Like New' },
+  { id: 'Good', label: 'Good' },
+  { id: 'Fair', label: 'Fair' },
+]
+
+// Required Sorting Options
+const SORT_OPTIONS = [
+  { id: 'closing-soon', label: 'Closing Soon' },
+  { id: 'price-low-high', label: 'Price: Low to High' },
+  { id: 'price-high-low', label: 'Price: High to Low' },
 ]
 
 export default function Home() {
+  // Filter & Search States
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [sortBy, setSortBy] = useState('ending-soon')
+  const [selectedCondition, setSelectedCondition] = useState('all')
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [sortBy, setSortBy] = useState('closing-soon')
   
   // Real-time ticking state (seconds elapsed)
   const [secondsElapsed, setSecondsElapsed] = useState(0)
@@ -199,31 +291,68 @@ export default function Home() {
     return { text, isUrgent, isEnded: false }
   }
 
-  // Filter and sort sample auctions
+  // Multi-filter logic: Title search, Category, Condition, Min Price, Max Price
   const filteredAuctions = SAMPLE_AUCTIONS.filter((auction) => {
+    // 1. Search bar filters by item title
+    const matchesTitle =
+      !searchQuery.trim() ||
+      auction.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
+
+    // 2. Category filter (Books, Electronics, Cycles, Other Items)
     const matchesCategory =
       selectedCategory === 'all' || auction.category === selectedCategory
-    const matchesSearch =
-      auction.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      auction.categoryName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      auction.campusLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      auction.seller.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+
+    // 3. Condition filter (New, Like New, Good, Fair)
+    const matchesCondition =
+      selectedCondition === 'all' || auction.condition === selectedCondition
+
+    // 4. Price filter (Min and Max price)
+    const minVal = minPrice !== '' ? Number(minPrice) : null
+    const maxVal = maxPrice !== '' ? Number(maxPrice) : null
+
+    const matchesMinPrice =
+      minVal === null || isNaN(minVal) || auction.currentBid >= minVal
+    const matchesMaxPrice =
+      maxVal === null || isNaN(maxVal) || auction.currentBid <= maxVal
+
+    return (
+      matchesTitle &&
+      matchesCategory &&
+      matchesCondition &&
+      matchesMinPrice &&
+      matchesMaxPrice
+    )
   }).sort((a, b) => {
-    if (sortBy === 'ending-soon') {
+    // 5. Sorting options
+    if (sortBy === 'closing-soon') {
       return a.initialMinutesLeft - b.initialMinutesLeft
     }
-    if (sortBy === 'price-low') {
+    if (sortBy === 'price-low-high') {
       return a.currentBid - b.currentBid
     }
-    if (sortBy === 'price-high') {
+    if (sortBy === 'price-high-low') {
       return b.currentBid - a.currentBid
-    }
-    if (sortBy === 'bids-count') {
-      return b.bidsCount - a.bidsCount
     }
     return 0
   })
+
+  // Check if any filters are active
+  const isFilterActive =
+    searchQuery.trim() !== '' ||
+    selectedCategory !== 'all' ||
+    selectedCondition !== 'all' ||
+    minPrice !== '' ||
+    maxPrice !== '' ||
+    sortBy !== 'closing-soon'
+
+  const handleResetFilters = () => {
+    setSearchQuery('')
+    setSelectedCategory('all')
+    setSelectedCondition('all')
+    setMinPrice('')
+    setMaxPrice('')
+    setSortBy('closing-soon')
+  }
 
   return (
     <div className="home-container">
@@ -295,47 +424,7 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* SEARCH BAR */}
-        <div className="search-bar-wrapper">
-          <div className="search-input-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search by item title, course, textbooks, dorm, or seller..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                className="btn-clear-search"
-                onClick={() => setSearchQuery('')}
-                title="Clear search"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* SORT CONTROLS */}
-          <div className="sort-dropdown-box">
-            <label htmlFor="sort-select" className="sort-label">Sort:</label>
-            <select
-              id="sort-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="sort-select"
-            >
-              <option value="ending-soon">⏰ Ending Soonest</option>
-              <option value="bids-count">🔥 Most Bids</option>
-              <option value="price-low">💰 Lowest Price</option>
-              <option value="price-high">💎 Highest Price</option>
-            </select>
-          </div>
-        </div>
-
-        {/* ITEM CATEGORIES TABS */}
+        {/* 1. CATEGORY FILTERS: Books, Electronics, Cycles, Other Items */}
         <div id="categories" className="category-pills-bar">
           {CATEGORIES.map((cat) => {
             const count =
@@ -357,49 +446,170 @@ export default function Home() {
             )
           })}
         </div>
+
+        {/* 2. SEARCH & ADVANCED FILTER PANEL */}
+        <div className="filter-panel-card">
+          {/* SEARCH BAR (Filters by Title) */}
+          <div className="filter-row-primary">
+            <div className="search-input-box">
+              <span className="search-icon">🔍</span>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search auctions by item title (e.g. TI-84, Trek, Organic Chemistry)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="btn-clear-search"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* SORTING CONTROLS */}
+            <div className="filter-control-group sort-group">
+              <label htmlFor="sort-select" className="filter-label">Sort By:</label>
+              <select
+                id="sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="filter-select"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* SECONDARY FILTERS: Condition & Price Range */}
+          <div className="filter-row-secondary">
+            {/* CONDITION FILTER: New, Like New, Good, Fair */}
+            <div className="filter-control-group">
+              <label htmlFor="condition-select" className="filter-label">Condition:</label>
+              <select
+                id="condition-select"
+                value={selectedCondition}
+                onChange={(e) => setSelectedCondition(e.target.value)}
+                className="filter-select"
+              >
+                {CONDITIONS.map((cond) => (
+                  <option key={cond.id} value={cond.id}>
+                    {cond.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* PRICE RANGE FILTER: Min Price & Max Price */}
+            <div className="filter-control-group price-range-group">
+              <span className="filter-label">Price Range ($):</span>
+              <div className="price-inputs-wrapper">
+                <div className="price-input-container">
+                  <span className="price-prefix">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Min"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    className="price-input"
+                  />
+                </div>
+                <span className="price-separator">to</span>
+                <div className="price-input-container">
+                  <span className="price-prefix">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Max"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    className="price-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* RESET ALL BUTTON */}
+            {isFilterActive && (
+              <button
+                type="button"
+                className="btn-clear-all-filters"
+                onClick={handleResetFilters}
+              >
+                ✕ Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* AUCTION CARDS GRID */}
       <section className="auction-grid-section">
         <div className="results-meta-bar">
           <span className="results-count-text">
-            Showing <strong>{filteredAuctions.length}</strong> {filteredAuctions.length === 1 ? 'auction' : 'auctions'}
-            {selectedCategory !== 'all' && ` in ${CATEGORIES.find(c => c.id === selectedCategory)?.label}`}
-            {searchQuery && ` matching "${searchQuery}"`}
+            Showing <strong>{filteredAuctions.length}</strong> {filteredAuctions.length === 1 ? 'item' : 'items'}
+            {selectedCategory !== 'all' && (
+              <span className="active-tag-chip">
+                Category: <strong>{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</strong>
+              </span>
+            )}
+            {selectedCondition !== 'all' && (
+              <span className="active-tag-chip">
+                Condition: <strong>{selectedCondition}</strong>
+              </span>
+            )}
+            {(minPrice !== '' || maxPrice !== '') && (
+              <span className="active-tag-chip">
+                Price: <strong>${minPrice || '0'} - ${maxPrice || '∞'}</strong>
+              </span>
+            )}
+            {searchQuery && (
+              <span className="active-tag-chip">
+                Title: <strong>"{searchQuery}"</strong>
+              </span>
+            )}
           </span>
 
-          {(searchQuery || selectedCategory !== 'all') && (
+          {isFilterActive && (
             <button
               type="button"
               className="btn-reset-filters"
-              onClick={() => {
-                setSearchQuery('')
-                setSelectedCategory('all')
-              }}
+              onClick={handleResetFilters}
             >
-              Reset Filters
+              Clear All
             </button>
           )}
         </div>
 
+        {/* 6. FRIENDLY NO-RESULTS MESSAGE */}
         {filteredAuctions.length === 0 ? (
           <div className="empty-results-card">
-            <span className="empty-icon">🔎</span>
-            <h3>No auctions found</h3>
-            <p>We couldn't find any campus items matching your search or filter.</p>
+            <span className="empty-icon">🔍</span>
+            <h3>No items match your selected filters</h3>
+            <p>
+              We couldn't find any auctions matching your current filter combination.
+              Try adjusting your price range, clearing specific filters, or searching with different keywords.
+            </p>
             <div className="empty-actions">
               <button
                 type="button"
                 className="btn-reset-filters-large"
-                onClick={() => {
-                  setSearchQuery('')
-                  setSelectedCategory('all')
-                }}
+                onClick={handleResetFilters}
               >
-                View All Auctions
+                Reset All Filters
               </button>
               <Link to="/auctions/create" className="btn-hero-primary">
-                + List This Item
+                + List an Item Instead
               </Link>
             </div>
           </div>
