@@ -3,7 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
+const path = require('path');
 const { testConnection } = require('./config/db');
+const { startAuctionScheduler } = require('./services/auctionCloser.service');
 
 // Route imports
 const listingRoutes = require('./routes/listing.routes');
@@ -15,7 +17,12 @@ const userRoutes = require('./routes/user.routes');
 const app = express();
 
 // Test MySQL Database connection
-testConnection();
+testConnection().then((connected) => {
+  if (connected) {
+    // Start background auction closing scheduler
+    startAuctionScheduler(10000); // Check every 10 seconds
+  }
+});
 
 // Middleware & Secure CORS configuration
 const allowedOrigins = [
@@ -42,10 +49,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
-// Main Listings API
+// Static serving for uploaded item photos
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Main Listings API (Includes bidding, closing results, seller decision, handover & image uploads)
 app.use('/api/listings', listingRoutes);
 
-// Additional REST routes (preserved for future milestones)
+// Additional REST routes (preserved for existing and future milestones)
 app.use('/api/auth', authRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/api/bids', bidRoutes);

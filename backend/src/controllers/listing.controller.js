@@ -480,7 +480,48 @@ exports.createListing = async (req, res) => {
     // Format for MySQL DATETIME
     const formattedClosingAt = closingDate.toISOString().slice(0, 19).replace('T', ' ');
 
-    // 9. Insert Listing into MySQL
+    // 9. Mandatory Image Verification
+    // Collect uploaded files from multipart/form-data or provided URLs/payloads
+    const imageList = [];
+
+    // Check files uploaded via multer (single or multiple)
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      req.files.forEach((file, idx) => {
+        imageList.push({
+          url: `/uploads/${file.filename}`,
+          is_primary: idx === 0,
+        });
+      });
+    } else if (req.file) {
+      imageList.push({
+        url: `/uploads/${req.file.filename}`,
+        is_primary: true,
+      });
+    } else if (Array.isArray(images) && images.length > 0) {
+      images.forEach((img, idx) => {
+        const url = typeof img === 'string' ? img.trim() : (img?.image_url || img?.url || '').trim();
+        if (url) {
+          imageList.push({
+            url,
+            is_primary: idx === 0 || Boolean(img?.is_primary),
+          });
+        }
+      });
+    } else {
+      const singleUrl = (image_url || imageUrl || '').trim();
+      if (singleUrl) {
+        imageList.push({ url: singleUrl, is_primary: true });
+      }
+    }
+
+    if (imageList.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Item image upload is mandatory. Please upload at least one photo of the item.',
+      });
+    }
+
+    // 10. Insert Listing into MySQL
     const insertSql = `
       INSERT INTO listings (
         seller_id,
@@ -508,25 +549,7 @@ exports.createListing = async (req, res) => {
 
     const newListingId = insertResult.insertId;
 
-    // 10. Process and insert images if provided
-    const imageList = [];
-    if (Array.isArray(images) && images.length > 0) {
-      images.forEach((img, idx) => {
-        const url = typeof img === 'string' ? img.trim() : (img?.image_url || img?.url || '').trim();
-        if (url) {
-          imageList.push({
-            url,
-            is_primary: idx === 0 || Boolean(img?.is_primary),
-          });
-        }
-      });
-    } else {
-      const singleUrl = (image_url || imageUrl || '').trim();
-      if (singleUrl) {
-        imageList.push({ url: singleUrl, is_primary: true });
-      }
-    }
-
+    // 11. Insert image records
     for (const img of imageList) {
       await pool.query(
         'INSERT INTO listing_images (listing_id, image_url, is_primary) VALUES (?, ?, ?)',

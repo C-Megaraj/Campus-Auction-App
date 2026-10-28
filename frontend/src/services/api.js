@@ -66,10 +66,24 @@ export const fetchMyListings = async () => {
 }
 
 /**
- * Create a new auction listing (Authenticated)
+ * Create a new auction listing (Authenticated, supports FormData or JSON)
  */
 export const createListing = async (listingData) => {
-  const { data } = await api.post('/listings', listingData)
+  const isFormData = listingData instanceof FormData
+  const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' }
+  const { data } = await api.post('/listings', listingData, { headers })
+  return data
+}
+
+/**
+ * Upload an image file directly (Returns hosted image URL)
+ */
+export const uploadImage = async (file) => {
+  const formData = new FormData()
+  formData.append('image', file)
+  const { data } = await api.post('/listings/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }
 
@@ -86,6 +100,62 @@ export const updateListing = async (id, listingData) => {
  */
 export const cancelListing = async (id) => {
   const { data } = await api.delete(`/listings/${id}`)
+  return data
+}
+
+// ==========================================
+// MILESTONE 1: BIDDING API HELPERS
+// ==========================================
+
+/**
+ * Place a bid on an auction listing (Authenticated student only)
+ */
+export const placeBid = async (listingId, amount) => {
+  const { data } = await api.post(`/listings/${listingId}/bids`, { amount })
+  return data
+}
+
+/**
+ * Fetch public bid history for a listing
+ */
+export const fetchBidHistory = async (listingId) => {
+  const { data } = await api.get(`/listings/${listingId}/bids`)
+  return data
+}
+
+// ========================================================
+// MILESTONES 2 & 3: RESULTS, SELLER DECISION & HANDOVER HELPERS
+// ========================================================
+
+/**
+ * Fetch auction result and handover status
+ */
+export const fetchAuctionResult = async (listingId) => {
+  const { data } = await api.get(`/listings/${listingId}/result`)
+  return data
+}
+
+/**
+ * Seller approves or rejects provisional result (Owner only)
+ */
+export const decideAuctionResult = async (listingId, decision) => {
+  const { data } = await api.post(`/listings/${listingId}/decision`, { decision })
+  return data
+}
+
+/**
+ * Seller accepts highest bid at any time to close early and sell (Owner only)
+ */
+export const acceptHighestBidEarly = async (listingId) => {
+  const { data } = await api.post(`/listings/${listingId}/accept-highest-bid`)
+  return data
+}
+
+/**
+ * Update campus handover stage (Seller or Winner only)
+ */
+export const updateHandoverStage = async (listingId, status) => {
+  const { data } = await api.patch(`/listings/${listingId}/handover`, { status })
   return data
 }
 
